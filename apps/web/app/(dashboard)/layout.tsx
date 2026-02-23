@@ -1,12 +1,11 @@
 "use client";
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/store/auth.store";
 import {
   LayoutDashboard,
   Package,
-  Warehouse,
   Truck,
   ShoppingCart,
   TrendingUp,
@@ -33,10 +32,25 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const { isAuthenticated, user, organization, logout } = useAuthStore();
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated) router.push("/login");
-  }, [isAuthenticated, router]);
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (hydrated && !isAuthenticated) {
+      router.push("/login");
+    }
+  }, [hydrated, isAuthenticated, router]);
+
+  if (!hydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-400">Loading...</div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) return null;
 
