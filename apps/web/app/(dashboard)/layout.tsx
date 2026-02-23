@@ -41,20 +41,29 @@ export default function DashboardLayout({
   }, []);
 
   useEffect(() => {
-    if (hydrated && !isAuthenticated) {
+    if (!hydrated) return;
+    if (!isAuthenticated) {
       router.push("/login");
     }
   }, [hydrated, isAuthenticated, router]);
 
+  // Show loading while hydrating from localStorage
   if (!hydrated) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-400">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-gray-400 text-sm">Loading...</div>
       </div>
     );
   }
 
-  if (!isAuthenticated) return null;
+  // Still not authenticated after hydration
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-gray-400 text-sm">Redirecting...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-100">
