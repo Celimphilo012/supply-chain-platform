@@ -1,16 +1,10 @@
-# apps/api/Dockerfile
-FROM node:20-alpine AS builder
+FROM node:20-alpine
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
-COPY . .
+COPY apps/api/package*.json ./apps/api/
+RUN npm install --prefix apps/api
+COPY apps/api ./apps/api
+WORKDIR /app/apps/api
 RUN npm run build
-
-FROM node:20-alpine AS runner
-WORKDIR /app
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json .
 EXPOSE 3001
-USER node
 CMD ["node", "dist/main.js"]
