@@ -139,14 +139,14 @@ export default function ForecastingPage() {
                 />
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip
-                  formatter={(value: any, name: string) => [
-                    Math.round(value),
-                    name === "predicted"
-                      ? "Predicted"
-                      : name === "upper"
-                        ? "Upper bound"
-                        : "Lower bound",
-                  ]}
+                  formatter={(value: any, name: string) => {
+                    const labels: Record<string, string> = {
+                      predicted: "Predicted",
+                      upper: "Upper bound",
+                      lower: "Lower bound",
+                    };
+                    return [Math.round(value as number), labels[name] ?? name];
+                  }}
                 />
                 <Legend />
                 <Line
