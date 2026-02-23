@@ -31,10 +31,12 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, user, organization, logout } = useAuthStore();
+  const { isAuthenticated, user, organization, logout, loadFromStorage } =
+    useAuthStore();
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    loadFromStorage();
     setHydrated(true);
   }, []);
 

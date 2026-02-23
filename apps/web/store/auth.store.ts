@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
 
 interface User {
   id: string;
@@ -25,34 +24,59 @@ interface AuthState {
   setAuth: (token: string, user: User, org: Organization) => void;
   setAccessToken: (token: string) => void;
   logout: () => void;
+  loadFromStorage: () => void;
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
+export const useAuthStore = create<AuthState>((set) => ({
+  accessToken: null,
+  user: null,
+  organization: null,
+  isAuthenticated: false,
+  setAuth: (token, user, org) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(
+        "auth-storage",
+        JSON.stringify({ token, user, org }),
+      );
+    }
+    set({ accessToken: token, user, organization: org, isAuthenticated: true });
+  },
+  setAccessToken: (token) => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("auth-storage");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        localStorage.setItem(
+          "auth-storage",
+          JSON.stringify({ ...parsed, token }),
+        );
+      }
+    }
+    set({ accessToken: token });
+  },
+  logout: () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("auth-storage");
+    }
+    set({
       accessToken: null,
       user: null,
       organization: null,
       isAuthenticated: false,
-      setAuth: (token, user, org) =>
+    });
+  },
+  loadFromStorage: () => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("auth-storage");
+      if (stored) {
+        const { token, user, org } = JSON.parse(stored);
         set({
           accessToken: token,
           user,
           organization: org,
           isAuthenticated: true,
-        }),
-      setAccessToken: (token) => set({ accessToken: token }),
-      logout: () =>
-        set({
-          accessToken: null,
-          user: null,
-          organization: null,
-          isAuthenticated: false,
-        }),
-    }),
-    {
-      name: "auth-storage",
-      storage: createJSONStorage(() => localStorage),
-    },
-  ),
-);
+        });
+      }
+    }
+  },
+}));
