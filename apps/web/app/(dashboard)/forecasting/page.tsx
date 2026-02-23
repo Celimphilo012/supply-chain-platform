@@ -138,9 +138,6 @@ export default function ForecastingPage() {
                   tickFormatter={(v) => v.slice(5)}
                 />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip
-                  formatter={(value: any) => [Math.round(value as number)]}
-                />
                 <Legend />
                 <Line
                   type="monotone"
