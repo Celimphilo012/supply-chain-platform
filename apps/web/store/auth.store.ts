@@ -1,4 +1,4 @@
-import { create } from "zustand";
+﻿import { create } from 'zustand';
 
 interface User {
   id: string;
@@ -27,55 +27,47 @@ interface AuthState {
   loadFromStorage: () => void;
 }
 
+const STORAGE_KEY = 'sc_auth';
+
 export const useAuthStore = create<AuthState>((set) => ({
   accessToken: null,
   user: null,
   organization: null,
   isAuthenticated: false,
   setAuth: (token, user, org) => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(
-        "auth-storage",
-        JSON.stringify({ token, user, org }),
-      );
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, user, org }));
     }
     set({ accessToken: token, user, organization: org, isAuthenticated: true });
   },
   setAccessToken: (token) => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("auth-storage");
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        localStorage.setItem(
-          "auth-storage",
-          JSON.stringify({ ...parsed, token }),
-        );
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...parsed, token }));
       }
     }
     set({ accessToken: token });
   },
   logout: () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("auth-storage");
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEY);
     }
-    set({
-      accessToken: null,
-      user: null,
-      organization: null,
-      isAuthenticated: false,
-    });
+    set({ accessToken: null, user: null, organization: null, isAuthenticated: false });
   },
   loadFromStorage: () => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("auth-storage");
-      if (stored) {
-        const { token, user, org } = JSON.parse(stored);
-        set({
-          accessToken: token,
-          user,
-          organization: org,
-          isAuthenticated: true,
-        });
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const { token, user, org } = JSON.parse(stored);
+          if (token && user) {
+            set({ accessToken: token, user, organization: org, isAuthenticated: true });
+          }
+        }
+      } catch (e) {
+        localStorage.removeItem(STORAGE_KEY);
       }
     }
   },
