@@ -8,9 +8,139 @@ import {
   Search,
   AlertTriangle,
   X,
-  SlidersHorizontal,
+  TrendingDown,
 } from "lucide-react";
 
+// ── shared style tokens ───────────────────────────────────────────────────
+const PAGE_PAD = "clamp(16px,3vw,28px)";
+const CARD: React.CSSProperties = {
+  background: "#fff",
+  borderRadius: 16,
+  border: "1px solid #e2e8f0",
+  overflow: "hidden",
+  boxShadow: "0 1px 3px rgba(0,0,0,.04)",
+};
+const TH: React.CSSProperties = {
+  padding: "10px 20px",
+  textAlign: "left" as const,
+  fontSize: 11,
+  fontWeight: 700,
+  color: "#94a3b8",
+  textTransform: "uppercase" as const,
+  letterSpacing: "0.06em",
+  background: "#f8fafc",
+  borderBottom: "1px solid #f1f5f9",
+  whiteSpace: "nowrap" as const,
+};
+const INPUT: React.CSSProperties = {
+  width: "100%",
+  padding: "11px 14px",
+  background: "#f8fafc",
+  border: "1.5px solid #e2e8f0",
+  borderRadius: 10,
+  fontSize: 13,
+  color: "#0f172a",
+  fontFamily: "inherit",
+  outline: "none",
+  transition: "border-color .15s",
+};
+const SELECT: React.CSSProperties = { ...INPUT };
+const LABEL: React.CSSProperties = {
+  display: "block",
+  fontSize: 13,
+  fontWeight: 600,
+  color: "#374151",
+  marginBottom: 6,
+};
+
+// ── stat mini-card ─────────────────────────────────────────────────────────
+function Stat({
+  label,
+  value,
+  color,
+  bg,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  bg: string;
+}) {
+  return (
+    <div
+      style={{
+        ...CARD,
+        padding: "16px 20px",
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+      }}
+    >
+      <div
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: 10,
+          background: bg,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        <Package size={18} color={color} />
+      </div>
+      <div>
+        <p style={{ fontSize: 24, fontWeight: 800, color, lineHeight: 1 }}>
+          {value}
+        </p>
+        <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 3 }}>{label}</p>
+      </div>
+    </div>
+  );
+}
+
+// ── skeleton rows ──────────────────────────────────────────────────────────
+function Skeletons() {
+  return (
+    <>
+      {[...Array(5)].map((_, i) => (
+        <tr key={i} style={{ borderBottom: "1px solid #f8fafc" }}>
+          {[...Array(6)].map((_, j) => (
+            <td key={j} style={{ padding: "14px 20px" }}>
+              <div
+                style={{
+                  height: 13,
+                  borderRadius: 6,
+                  background: "#f1f5f9",
+                  width: `${45 + j * 9}%`,
+                  animation: "skpulse 1.4s ease-in-out infinite",
+                }}
+              />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
+  );
+}
+
+// ── modal field wrapper ────────────────────────────────────────────────────
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label style={LABEL}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+// ── main ──────────────────────────────────────────────────────────────────
 export default function InventoryPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -27,17 +157,14 @@ export default function InventoryPage() {
     queryKey: ["inventory"],
     queryFn: () => api.get("/inventory").then((r) => r.data),
   });
-
   const { data: lowStock } = useQuery({
     queryKey: ["inventory", "low-stock"],
     queryFn: () => api.get("/inventory/low-stock").then((r) => r.data),
   });
-
   const { data: warehouses } = useQuery({
     queryKey: ["warehouses"],
     queryFn: () => api.get("/warehouses").then((r) => r.data),
   });
-
   const { data: products } = useQuery({
     queryKey: ["products"],
     queryFn: () => api.get("/products").then((r) => r.data),
@@ -63,187 +190,200 @@ export default function InventoryPage() {
       inv.product?.name?.toLowerCase().includes(search.toLowerCase()) ||
       inv.product?.sku?.toLowerCase().includes(search.toLowerCase()),
   );
-
-  const inStockCount =
-    inventory?.filter(
-      (inv: any) => !inv.reorderPoint || inv.quantityOnHand > inv.reorderPoint,
-    ).length ?? 0;
+  const totalCount = inventory?.length ?? 0;
   const lowStockCount = lowStock?.length ?? 0;
+  const inStockCount = totalCount - lowStockCount;
+
+  const set = (k: string, v: any) => setAdjustData((d) => ({ ...d, [k]: v }));
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <div
+      style={{
+        padding: PAGE_PAD,
+        maxWidth: 1280,
+        margin: "0 auto",
+        display: "flex",
+        flexDirection: "column",
+        gap: 20,
+        fontFamily: "'Outfit', sans-serif",
+      }}
+    >
+      <style>{`
+        @keyframes skpulse{0%,100%{opacity:1}50%{opacity:.4}}
+        .inv-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+        @media(max-width:600px){.inv-stats{grid-template-columns:1fr 1fr}}
+        tr:hover td{background:#f8faff !important}
+        .adj-input:focus{border-color:#6366f1 !important;background:#fff !important}
+      `}</style>
+
+      {/* ── page header ── */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Inventory</h1>
-          <p className="text-gray-500 text-sm mt-0.5">
+          <h1
+            style={{
+              fontSize: 22,
+              fontWeight: 800,
+              color: "#0f172a",
+              lineHeight: 1.2,
+            }}
+          >
+            Inventory
+          </h1>
+          <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 4 }}>
             Track and manage stock across all warehouses
           </p>
         </div>
         <button
           onClick={() => setShowAdjust(true)}
-          className="inline-flex items-center gap-2 text-white font-semibold px-5 py-2.5 rounded-2xl text-sm transition-all hover:opacity-90 active:scale-95"
           style={{
-            background: "linear-gradient(135deg, #2563eb, #4f46e5)",
-            boxShadow: "0 4px 16px rgba(37,99,235,0.3)",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 20px",
+            borderRadius: 12,
+            background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: 13,
+            border: "none",
+            cursor: "pointer",
+            boxShadow: "0 4px 14px rgba(99,102,241,.35)",
+            fontFamily: "inherit",
+            whiteSpace: "nowrap",
           }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = ".88")}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
         >
-          <Plus size={16} />
+          <Plus size={15} />
           Adjust Stock
         </button>
       </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div
-          className="bg-white rounded-2xl p-4 border border-gray-100"
-          style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
-        >
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
-            Total SKUs
-          </p>
-          <p className="text-2xl font-bold text-gray-900">
-            {inventory?.length ?? 0}
-          </p>
-        </div>
-        <div
-          className="bg-white rounded-2xl p-4 border border-gray-100"
-          style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}
-        >
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
-            In Stock
-          </p>
-          <p className="text-2xl font-bold" style={{ color: "#16a34a" }}>
-            {inStockCount}
-          </p>
-        </div>
-        <div
-          className="rounded-2xl p-4 border"
-          style={{
-            background: lowStockCount > 0 ? "#fffbeb" : "#f0fdf4",
-            borderColor: lowStockCount > 0 ? "#fde68a" : "#bbf7d0",
-            boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
-          }}
-        >
-          <p
-            className="text-xs font-bold uppercase tracking-wider mb-1"
-            style={{ color: lowStockCount > 0 ? "#b45309" : "#15803d" }}
-          >
-            Low Stock
-          </p>
-          <p
-            className="text-2xl font-bold"
-            style={{ color: lowStockCount > 0 ? "#d97706" : "#16a34a" }}
-          >
-            {lowStockCount}
-          </p>
-        </div>
+      {/* ── stat row ── */}
+      <div className="inv-stats">
+        <Stat
+          label="Total SKUs"
+          value={totalCount}
+          color="#3b82f6"
+          bg="#eff6ff"
+        />
+        <Stat
+          label="In Stock"
+          value={inStockCount}
+          color="#16a34a"
+          bg="#f0fdf4"
+        />
+        <Stat
+          label="Low Stock"
+          value={lowStockCount}
+          color={lowStockCount > 0 ? "#d97706" : "#16a34a"}
+          bg={lowStockCount > 0 ? "#fffbeb" : "#f0fdf4"}
+        />
       </div>
 
-      {/* Low stock alert */}
+      {/* ── alert banner ── */}
       {lowStockCount > 0 && (
         <div
-          className="rounded-2xl p-4 mb-5 flex items-center gap-3"
           style={{
-            background: "linear-gradient(135deg, #fffbeb, #fef3c7)",
+            background: "#fffbeb",
             border: "1px solid #fde68a",
+            borderRadius: 14,
+            padding: "14px 18px",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
           }}
         >
           <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: "#f59e0b" }}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 9,
+              background: "#fef3c7",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
           >
-            <AlertTriangle size={16} className="text-white" />
+            <AlertTriangle size={16} color="#d97706" />
           </div>
           <div>
-            <p className="text-amber-800 font-bold text-sm">
-              {lowStockCount} item{lowStockCount > 1 ? "s" : ""} need restocking
+            <p style={{ fontSize: 14, fontWeight: 600, color: "#92400e" }}>
+              {lowStockCount} item{lowStockCount > 1 ? "s" : ""} below reorder
+              point
             </p>
-            <p className="text-amber-600 text-xs mt-0.5">
-              These products are at or below their reorder point
+            <p style={{ fontSize: 12, color: "#b45309", marginTop: 2 }}>
+              Review and restock to avoid disruptions
             </p>
           </div>
         </div>
       )}
 
-      {/* Table */}
-      <div
-        className="bg-white rounded-3xl overflow-hidden"
-        style={{
-          boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
-          border: "1px solid #e8edf2",
-        }}
-      >
+      {/* ── table card ── */}
+      <div style={CARD}>
+        {/* search bar */}
         <div
-          className="px-6 py-4 flex items-center gap-3"
-          style={{ borderBottom: "1px solid #f1f5f9" }}
+          style={{
+            padding: "14px 20px",
+            borderBottom: "1px solid #f1f5f9",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            background: "#fafbfc",
+          }}
         >
-          <div className="relative flex-1 max-w-sm">
+          <div style={{ position: "relative", flex: 1, maxWidth: 340 }}>
             <Search
-              size={15}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
+              size={14}
+              color="#94a3b8"
+              style={{
+                position: "absolute",
+                left: 11,
+                top: "50%",
+                transform: "translateY(-50%)",
+                pointerEvents: "none",
+              }}
             />
             <input
               type="text"
-              placeholder="Search products, SKUs..."
+              placeholder="Search products or SKU…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-400 transition-colors"
-              style={{ background: "#f8fafc", border: "2px solid #f1f5f9" }}
+              style={{ ...INPUT, paddingLeft: 34, fontSize: 13 }}
+              className="adj-input"
             />
           </div>
-          <button
-            className="inline-flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-gray-500 font-medium hover:bg-gray-50 transition-colors"
-            style={{ border: "2px solid #f1f5f9" }}
-          >
-            <SlidersHorizontal size={14} />
-            <span className="hidden sm:block">Filter</span>
-          </button>
+          <p style={{ fontSize: 12, color: "#94a3b8", flexShrink: 0 }}>
+            {filtered?.length ?? 0} result
+            {(filtered?.length ?? 0) !== 1 ? "s" : ""}
+          </p>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        {/* table */}
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
-              <tr
-                style={{
-                  background: "#fafbfc",
-                  borderBottom: "2px solid #f1f5f9",
-                }}
-              >
-                {[
-                  "Product",
-                  "Warehouse",
-                  "On Hand",
-                  "Reserved",
-                  "Reorder Point",
-                  "Status",
-                ].map((h) => (
-                  <th
-                    key={h}
-                    className="text-left px-6 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider"
-                  >
-                    {h}
-                  </th>
-                ))}
+              <tr>
+                <th style={TH}>Product</th>
+                <th style={TH}>Warehouse</th>
+                <th style={{ ...TH, textAlign: "right" }}>On Hand</th>
+                <th style={{ ...TH, textAlign: "right" }}>Reserved</th>
+                <th style={{ ...TH, textAlign: "right" }}>Reorder Pt</th>
+                <th style={TH}>Status</th>
               </tr>
             </thead>
             <tbody>
-              {isLoading &&
-                [...Array(6)].map((_, i) => (
-                  <tr key={i} style={{ borderBottom: "1px solid #f8f9fa" }}>
-                    {[...Array(6)].map((_, j) => (
-                      <td key={j} className="px-6 py-4">
-                        <div
-                          className="h-4 rounded-lg animate-pulse"
-                          style={{
-                            background: "#f1f5f9",
-                            width: `${40 + j * 10}%`,
-                          }}
-                        />
-                      </td>
-                    ))}
-                  </tr>
-                ))}
+              {isLoading && <Skeletons />}
+
               {filtered?.map((inv: any) => {
                 const isLow =
                   inv.reorderPoint && inv.quantityOnHand <= inv.reorderPoint;
@@ -256,61 +396,141 @@ export default function InventoryPage() {
                 return (
                   <tr
                     key={inv.id}
-                    style={{ borderBottom: "1px solid #f8f9fa" }}
-                    className="hover:bg-blue-50/30 transition-colors"
+                    style={{
+                      borderBottom: "1px solid #f8fafc",
+                      transition: "background .1s",
+                    }}
                   >
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-bold text-gray-900">
+                    {/* product */}
+                    <td style={{ padding: "13px 20px" }}>
+                      <p
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "#0f172a",
+                        }}
+                      >
                         {inv.product?.name}
                       </p>
-                      <p className="text-xs font-mono text-gray-400 mt-0.5 bg-gray-50 inline-block px-1.5 py-0.5 rounded">
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: "#94a3b8",
+                          fontFamily: "monospace",
+                          background: "#f8fafc",
+                          border: "1px solid #e2e8f0",
+                          borderRadius: 4,
+                          padding: "1px 6px",
+                          display: "inline-block",
+                          marginTop: 3,
+                        }}
+                      >
                         {inv.product?.sku}
+                      </span>
+                    </td>
+
+                    {/* warehouse */}
+                    <td style={{ padding: "13px 20px" }}>
+                      <span
+                        style={{
+                          fontSize: 12,
+                          color: "#475569",
+                          background: "#f1f5f9",
+                          border: "1px solid #e2e8f0",
+                          borderRadius: 6,
+                          padding: "3px 9px",
+                        }}
+                      >
+                        {inv.warehouse?.name}
+                      </span>
+                    </td>
+
+                    {/* on hand + mini bar */}
+                    <td style={{ padding: "13px 20px", textAlign: "right" }}>
+                      <p
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 800,
+                          color: "#0f172a",
+                          lineHeight: 1,
+                        }}
+                      >
+                        {inv.quantityOnHand}
                       </p>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {inv.warehouse?.name}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-sm font-bold text-gray-900">
-                          {inv.quantityOnHand}
-                        </span>
-                        {inv.reorderPoint && (
+                      {inv.reorderPoint && (
+                        <div
+                          style={{
+                            width: 56,
+                            height: 4,
+                            borderRadius: 99,
+                            background: "#f1f5f9",
+                            marginTop: 5,
+                            marginLeft: "auto",
+                          }}
+                        >
                           <div
-                            className="w-20 h-1.5 rounded-full"
-                            style={{ background: "#f1f5f9" }}
-                          >
-                            <div
-                              className="h-full rounded-full"
-                              style={{
-                                width: `${pct}%`,
-                                background: isLow
-                                  ? "linear-gradient(90deg, #ef4444, #f97316)"
-                                  : "linear-gradient(90deg, #10b981, #34d399)",
-                              }}
-                            />
-                          </div>
-                        )}
-                      </div>
+                            style={{
+                              height: "100%",
+                              borderRadius: 99,
+                              width: `${pct}%`,
+                              background: isLow
+                                ? "linear-gradient(90deg,#ef4444,#f97316)"
+                                : "linear-gradient(90deg,#10b981,#34d399)",
+                            }}
+                          />
+                        </div>
+                      )}
                     </td>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-500">
+
+                    {/* reserved */}
+                    <td
+                      style={{
+                        padding: "13px 20px",
+                        textAlign: "right",
+                        fontSize: 13,
+                        color: "#64748b",
+                        fontWeight: 500,
+                      }}
+                    >
                       {inv.quantityReserved ?? 0}
                     </td>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-500">
+
+                    {/* reorder */}
+                    <td
+                      style={{
+                        padding: "13px 20px",
+                        textAlign: "right",
+                        fontSize: 13,
+                        color: "#64748b",
+                        fontWeight: 500,
+                      }}
+                    >
                       {inv.reorderPoint ?? "—"}
                     </td>
-                    <td className="px-6 py-4">
+
+                    {/* status badge */}
+                    <td style={{ padding: "13px 20px" }}>
                       <span
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold"
-                        style={
-                          isLow
-                            ? { background: "#fef2f2", color: "#dc2626" }
-                            : { background: "#f0fdf4", color: "#16a34a" }
-                        }
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 5,
+                          padding: "4px 10px",
+                          borderRadius: 20,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          background: isLow ? "#fff1f2" : "#f0fdf4",
+                          color: isLow ? "#e11d48" : "#16a34a",
+                          border: `1px solid ${isLow ? "#fecdd3" : "#bbf7d0"}`,
+                        }}
                       >
                         <span
-                          className="w-1.5 h-1.5 rounded-full"
-                          style={{ background: isLow ? "#ef4444" : "#22c55e" }}
+                          style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: "50%",
+                            background: isLow ? "#e11d48" : "#22c55e",
+                          }}
                         />
                         {isLow ? "Low Stock" : "In Stock"}
                       </span>
@@ -318,21 +538,38 @@ export default function InventoryPage() {
                   </tr>
                 );
               })}
+
+              {/* empty state */}
               {!isLoading && (!filtered || filtered.length === 0) && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-20 text-center">
+                  <td
+                    colSpan={6}
+                    style={{ padding: "60px 20px", textAlign: "center" }}
+                  >
                     <div
-                      className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
                       style={{
-                        background: "linear-gradient(135deg, #eff6ff, #f0fdf4)",
+                        width: 56,
+                        height: 56,
+                        borderRadius: 14,
+                        background: "#f8fafc",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        margin: "0 auto 12px",
                       }}
                     >
-                      <Package size={28} className="text-gray-300" />
+                      <TrendingDown size={26} color="#cbd5e1" />
                     </div>
-                    <p className="text-gray-500 font-semibold mb-1">
+                    <p
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: "#475569",
+                      }}
+                    >
                       No inventory found
                     </p>
-                    <p className="text-gray-400 text-sm">
+                    <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 4 }}>
                       Try a different search term
                     </p>
                   </td>
@@ -343,112 +580,148 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* Adjust Modal */}
+      {/* ════════════════════════════════
+          ADJUST STOCK MODAL
+      ════════════════════════════════ */}
       {showAdjust && (
         <div
-          className="fixed inset-0 flex items-center justify-center z-50 p-4"
           style={{
-            background: "rgba(15,23,42,0.6)",
-            backdropFilter: "blur(8px)",
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,.55)",
+            backdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 60,
+            padding: 16,
           }}
         >
           <div
-            className="bg-white rounded-3xl w-full max-w-md"
-            style={{ boxShadow: "0 32px 80px rgba(0,0,0,0.25)" }}
+            style={{
+              background: "#fff",
+              borderRadius: 20,
+              width: "100%",
+              maxWidth: 460,
+              boxShadow: "0 24px 64px rgba(0,0,0,.22)",
+              overflow: "hidden",
+              fontFamily: "'Outfit', sans-serif",
+            }}
           >
+            {/* modal header */}
             <div
-              className="px-6 py-5 flex items-center justify-between"
-              style={{ borderBottom: "1px solid #f1f5f9" }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "18px 22px",
+                borderBottom: "1px solid #f1f5f9",
+              }}
             >
-              <div>
-                <h2 className="font-bold text-gray-900">Adjust Stock</h2>
-                <p className="text-gray-400 text-xs mt-0.5">
-                  Update inventory quantities
-                </p>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 9,
+                    background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Package size={16} color="#fff" />
+                </div>
+                <div>
+                  <p
+                    style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}
+                  >
+                    Adjust Stock
+                  </p>
+                  <p style={{ fontSize: 12, color: "#94a3b8" }}>
+                    Update inventory quantities
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => setShowAdjust(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 transition-colors"
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  background: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  color: "#64748b",
+                }}
               >
-                <X size={16} />
+                <X size={15} />
               </button>
             </div>
-            <div className="px-6 py-5 space-y-4">
-              {[
-                {
-                  label: "Product",
-                  key: "productId",
-                  options: products?.data?.map((p: any) => ({
-                    value: p.id,
-                    label: `${p.name} (${p.sku})`,
-                  })),
-                },
-                {
-                  label: "Warehouse",
-                  key: "warehouseId",
-                  options: warehouses?.map((w: any) => ({
-                    value: w.id,
-                    label: w.name,
-                  })),
-                },
-              ].map((field) => (
-                <div key={field.key}>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    {field.label}
-                  </label>
-                  <select
-                    value={(adjustData as any)[field.key]}
-                    onChange={(e) =>
-                      setAdjustData((d) => ({
-                        ...d,
-                        [field.key]: e.target.value,
-                      }))
-                    }
-                    className="w-full rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none transition-all"
-                    style={{
-                      background: "#f8fafc",
-                      border: "2px solid #f1f5f9",
-                    }}
-                  >
-                    <option value="">
-                      Select {field.label.toLowerCase()}...
+
+            {/* modal body */}
+            <div
+              style={{
+                padding: "20px 22px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 16,
+              }}
+            >
+              <Field label="Product">
+                <select
+                  value={adjustData.productId}
+                  onChange={(e) => set("productId", e.target.value)}
+                  style={SELECT}
+                  className="adj-input"
+                >
+                  <option value="">Select product…</option>
+                  {products?.data?.map((p: any) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.sku})
                     </option>
-                    {field.options?.map((o: any) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ))}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Transaction Type
-                </label>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Warehouse">
+                <select
+                  value={adjustData.warehouseId}
+                  onChange={(e) => set("warehouseId", e.target.value)}
+                  style={SELECT}
+                  className="adj-input"
+                >
+                  <option value="">Select warehouse…</option>
+                  {warehouses?.map((w: any) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Transaction Type">
                 <select
                   value={adjustData.transactionType}
-                  onChange={(e) =>
-                    setAdjustData((d) => ({
-                      ...d,
-                      transactionType: e.target.value,
-                    }))
-                  }
-                  className="w-full rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none"
-                  style={{ background: "#f8fafc", border: "2px solid #f1f5f9" }}
+                  onChange={(e) => set("transactionType", e.target.value)}
+                  style={SELECT}
+                  className="adj-input"
                 >
-                  <option value="receipt">📥 Receipt — add stock</option>
-                  <option value="sale">📤 Sale — remove stock</option>
-                  <option value="adjustment">🔧 Manual adjustment</option>
-                  <option value="write_off">❌ Write off</option>
-                  <option value="return">↩️ Return</option>
+                  <option value="receipt">Receipt — add stock</option>
+                  <option value="sale">Sale — remove stock</option>
+                  <option value="adjustment">Manual adjustment</option>
+                  <option value="write_off">Write off</option>
+                  <option value="return">Return</option>
                 </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Quantity
-                </label>
+              </Field>
+
+              <Field label="Quantity">
                 <input
                   type="number"
+                  min="0"
                   value={Math.abs(adjustData.quantityDelta)}
                   onChange={(e) => {
                     const val = parseInt(e.target.value) || 0;
@@ -457,34 +730,47 @@ export default function InventoryPage() {
                     )
                       ? -val
                       : val;
-                    setAdjustData((d) => ({ ...d, quantityDelta: delta }));
+                    set("quantityDelta", delta);
                   }}
-                  className="w-full rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none"
-                  style={{ background: "#f8fafc", border: "2px solid #f1f5f9" }}
-                  min="0"
+                  style={INPUT}
+                  className="adj-input"
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Notes
-                </label>
+              </Field>
+
+              <Field label="Notes">
                 <input
                   type="text"
                   value={adjustData.notes}
-                  onChange={(e) =>
-                    setAdjustData((d) => ({ ...d, notes: e.target.value }))
-                  }
-                  placeholder="Reason for adjustment..."
-                  className="w-full rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none placeholder-gray-300"
-                  style={{ background: "#f8fafc", border: "2px solid #f1f5f9" }}
+                  onChange={(e) => set("notes", e.target.value)}
+                  placeholder="Reason for adjustment…"
+                  style={INPUT}
+                  className="adj-input"
                 />
-              </div>
+              </Field>
             </div>
-            <div className="flex gap-3 px-6 pb-6">
+
+            {/* modal footer */}
+            <div style={{ padding: "0 22px 20px", display: "flex", gap: 10 }}>
               <button
                 onClick={() => setShowAdjust(false)}
-                className="flex-1 py-3 rounded-2xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
-                style={{ border: "2px solid #f1f5f9" }}
+                style={{
+                  flex: 1,
+                  padding: "12px",
+                  borderRadius: 11,
+                  background: "#f8fafc",
+                  border: "1.5px solid #e2e8f0",
+                  color: "#475569",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "#f1f5f9")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = "#f8fafc")
+                }
               >
                 Cancel
               </button>
@@ -495,12 +781,27 @@ export default function InventoryPage() {
                   !adjustData.warehouseId ||
                   adjustMutation.isPending
                 }
-                className="flex-1 py-3 rounded-2xl text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50"
                 style={{
-                  background: "linear-gradient(135deg, #2563eb, #4f46e5)",
+                  flex: 1,
+                  padding: "12px",
+                  borderRadius: 11,
+                  background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+                  color: "#fff",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  border: "none",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  opacity:
+                    !adjustData.productId ||
+                    !adjustData.warehouseId ||
+                    adjustMutation.isPending
+                      ? 0.5
+                      : 1,
+                  boxShadow: "0 4px 14px rgba(99,102,241,.3)",
                 }}
               >
-                {adjustMutation.isPending ? "Saving..." : "Confirm Adjustment"}
+                {adjustMutation.isPending ? "Saving…" : "Confirm Adjustment"}
               </button>
             </div>
           </div>
