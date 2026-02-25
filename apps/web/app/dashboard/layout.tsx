@@ -12,47 +12,46 @@ import {
   LogOut,
   Menu,
   X,
-  ChevronRight,
   Bell,
 } from "lucide-react";
 
-const navItems = [
+const NAV = [
   {
     href: "/dashboard",
     label: "Dashboard",
     icon: LayoutDashboard,
-    color: "text-blue-400",
-    bg: "bg-blue-500/20",
+    accent: "#3b82f6",
   },
   {
     href: "/dashboard/inventory",
     label: "Inventory",
     icon: Package,
-    color: "text-emerald-400",
-    bg: "bg-emerald-500/20",
+    accent: "#10b981",
   },
   {
     href: "/dashboard/suppliers",
     label: "Suppliers",
     icon: Truck,
-    color: "text-purple-400",
-    bg: "bg-purple-500/20",
+    accent: "#8b5cf6",
   },
   {
     href: "/dashboard/purchase-orders",
     label: "Purchase Orders",
     icon: ShoppingCart,
-    color: "text-amber-400",
-    bg: "bg-amber-500/20",
+    accent: "#f59e0b",
   },
   {
     href: "/dashboard/forecasting",
     label: "Forecasting",
     icon: TrendingUp,
-    color: "text-pink-400",
-    bg: "bg-pink-500/20",
+    accent: "#ec4899",
   },
 ];
+
+const SIDEBAR_BG = "#0f172a";
+const SIDEBAR_W = "240px";
+const TOPBAR_H = "60px";
+const PAGE_BG = "#f1f5f9";
 
 export default function DashboardLayout({
   children,
@@ -70,179 +69,349 @@ export default function DashboardLayout({
     loadFromStorage();
     setHydrated(true);
   }, []);
-
   useEffect(() => {
-    if (!hydrated) return;
-    if (!isAuthenticated) router.push("/login");
+    if (hydrated && !isAuthenticated) router.push("/login");
   }, [hydrated, isAuthenticated, router]);
 
-  if (!hydrated) {
+  if (!hydrated)
     return (
       <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ background: "linear-gradient(135deg, #0f172a, #1e3a8a)" }}
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: SIDEBAR_BG,
+          fontFamily: "'Outfit', sans-serif",
+        }}
       >
-        <div className="text-center">
-          <div className="w-12 h-12 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-blue-200 text-sm">Loading your workspace...</p>
+        <div style={{ textAlign: "center" }}>
+          <div
+            style={{
+              width: 44,
+              height: 44,
+              border: "3px solid rgba(99,102,241,.3)",
+              borderTopColor: "#6366f1",
+              borderRadius: "50%",
+              margin: "0 auto 14px",
+              animation: "spin 0.8s linear infinite",
+            }}
+          />
+          <p style={{ color: "rgba(255,255,255,.4)", fontSize: 14 }}>
+            Loading workspace…
+          </p>
         </div>
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
     );
-  }
 
   if (!isAuthenticated) return null;
 
-  const currentItem = navItems.find((item) => item.href === pathname);
-  const currentPage = currentItem?.label ?? "Dashboard";
+  const current = NAV.find((n) => n.href === pathname) ?? NAV[0];
+  const initials = `${user?.firstName?.[0] ?? ""}${user?.lastName?.[0] ?? ""}`;
 
   return (
     <div
-      className="flex h-screen overflow-hidden"
-      style={{ background: "#f0f4f8" }}
+      style={{
+        display: "flex",
+        height: "100vh",
+        overflow: "hidden",
+        fontFamily: "'Outfit', sans-serif",
+        background: PAGE_BG,
+      }}
     >
-      {/* Mobile overlay */}
+      {/* ── mobile overlay ── */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-20 lg:hidden"
           onClick={() => setSidebarOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,.55)",
+            zIndex: 40,
+            backdropFilter: "blur(3px)",
+          }}
         />
       )}
 
-      {/* Sidebar */}
+      {/* ════════════════════════════════
+          SIDEBAR
+      ════════════════════════════════ */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-30 w-64 flex flex-col transform transition-transform duration-200 ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
         style={{
-          background: "linear-gradient(180deg, #0f172a 0%, #1e1b4b 100%)",
+          position: "fixed" as const,
+          top: 0,
+          left: 0,
+          bottom: 0,
+          width: SIDEBAR_W,
+          background: SIDEBAR_BG,
+          display: "flex",
+          flexDirection: "column" as const,
+          zIndex: 50,
+          transform: sidebarOpen ? "translateX(0)" : undefined,
+          transition: "transform .2s ease",
+          // on desktop always visible via CSS below
         }}
+        className="lg-sidebar"
       >
-        {/* Logo area */}
+        <style>{`
+          @media(min-width:1024px){
+            .lg-sidebar{ transform:translateX(0) !important; position:static !important; flex-shrink:0; }
+            .lg-push{ margin-left:0 !important; }
+          }
+          @media(max-width:1023px){
+            .lg-sidebar{ transform:translateX(${sidebarOpen ? "0" : "-100%"}); }
+          }
+        `}</style>
+
+        {/* logo */}
         <div
-          className="flex items-center justify-between px-5 h-16 flex-shrink-0"
-          style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}
+          style={{
+            padding: "20px 20px 16px",
+            borderBottom: "1px solid rgba(255,255,255,.07)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
         >
-          <div className="flex items-center gap-3">
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div
-              className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{
-                background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+                boxShadow: "0 4px 14px rgba(99,102,241,.4)",
               }}
             >
               <svg
-                width="16"
-                height="16"
+                width="18"
+                height="18"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="white"
-                strokeWidth="2.5"
+                strokeWidth="2.2"
               >
                 <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
                 <polyline points="9,22 9,12 15,12 15,22" />
               </svg>
             </div>
             <div>
-              <p className="text-white font-bold text-sm leading-tight truncate max-w-[120px]">
+              <p
+                style={{
+                  color: "#fff",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  lineHeight: 1.2,
+                  maxWidth: 130,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
                 {organization?.name ?? "Supply Chain"}
               </p>
-              <p className="text-slate-500 text-xs">Pro workspace</p>
+              <p style={{ color: "rgba(255,255,255,.3)", fontSize: 11 }}>
+                Pro Workspace
+              </p>
             </div>
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
-            className="lg:hidden text-slate-400 hover:text-white p-1"
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "rgba(255,255,255,.3)",
+              padding: 4,
+              display: "flex",
+            }}
+            className="lg-hide"
           >
             <X size={16} />
           </button>
+          <style>{`.lg-hide{display:flex}@media(min-width:1024px){.lg-hide{display:none}}`}</style>
         </div>
 
-        {/* User card */}
+        {/* user card */}
         <div
-          className="mx-3 my-3 rounded-2xl p-3 flex items-center gap-3 flex-shrink-0"
-          style={{ background: "rgba(255,255,255,0.06)" }}
+          style={{
+            margin: "12px 12px 4px",
+            padding: "10px 12px",
+            background: "rgba(255,255,255,.05)",
+            borderRadius: 12,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            border: "1px solid rgba(255,255,255,.07)",
+          }}
         >
           <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 font-bold text-sm"
             style={{
-              background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
-              color: "white",
+              width: 34,
+              height: 34,
+              borderRadius: 9,
+              background: "linear-gradient(135deg,#3b82f6,#8b5cf6)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#fff",
+              fontWeight: 700,
+              fontSize: 12,
+              flexShrink: 0,
             }}
           >
-            {user?.firstName?.[0]}
-            {user?.lastName?.[0]}
+            {initials}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-white text-sm font-medium truncate">
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p
+              style={{
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 600,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
               {user?.firstName} {user?.lastName}
             </p>
-            <p className="text-slate-400 text-xs truncate">{user?.email}</p>
+            <p
+              style={{
+                color: "rgba(255,255,255,.3)",
+                fontSize: 11,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {user?.email}
+            </p>
           </div>
           <div
-            className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0"
-            title="Online"
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: "#10b981",
+              boxShadow: "0 0 6px #10b981",
+              flexShrink: 0,
+            }}
           />
         </div>
 
-        {/* Nav items */}
-        <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
-          <p className="text-slate-600 text-xs font-bold uppercase tracking-widest px-3 mb-3 mt-1">
-            Navigation
+        {/* nav */}
+        <nav
+          style={{
+            flex: 1,
+            padding: "8px 10px",
+            overflowY: "auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+          }}
+        >
+          <p
+            style={{
+              color: "rgba(255,255,255,.2)",
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              padding: "8px 10px 6px",
+            }}
+          >
+            Menu
           </p>
-          {navItems.map((item) => {
+          {NAV.map((item) => {
             const active = pathname === item.href;
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group relative ${active ? "text-white" : "text-slate-400 hover:text-white hover:bg-white/5"}`}
-                style={
-                  active
-                    ? {
-                        background:
-                          "linear-gradient(135deg, rgba(59,130,246,0.3), rgba(139,92,246,0.3))",
-                        border: "1px solid rgba(99,102,241,0.4)",
-                      }
-                    : {}
-                }
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 12px",
+                  borderRadius: 11,
+                  textDecoration: "none",
+                  transition: "background .15s",
+                  background: active ? "rgba(255,255,255,.08)" : "transparent",
+                  borderLeft: active
+                    ? `3px solid ${item.accent}`
+                    : "3px solid transparent",
+                }}
               >
-                {active && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 rounded-r-full bg-blue-400" />
-                )}
                 <div
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${active ? item.bg : "bg-white/5 group-hover:bg-white/10"}`}
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    background: active
+                      ? `${item.accent}22`
+                      : "rgba(255,255,255,.05)",
+                  }}
                 >
                   <item.icon
                     size={14}
-                    className={
-                      active
-                        ? item.color
-                        : "text-slate-400 group-hover:text-slate-200"
-                    }
+                    color={active ? item.accent : "rgba(255,255,255,.35)"}
                   />
                 </div>
-                <span className="flex-1">{item.label}</span>
-                {active && (
-                  <ChevronRight size={12} className="text-slate-400" />
-                )}
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: active ? 600 : 400,
+                    color: active ? "#fff" : "rgba(255,255,255,.45)",
+                  }}
+                >
+                  {item.label}
+                </span>
               </Link>
             );
           })}
         </nav>
 
-        {/* Bottom */}
+        {/* sign out */}
         <div
-          className="px-3 pb-4 space-y-1 flex-shrink-0"
-          style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+          style={{
+            padding: "10px 10px 16px",
+            borderTop: "1px solid rgba(255,255,255,.06)",
+          }}
         >
-          <div className="px-3 py-2 mt-3">
+          <div style={{ padding: "6px 12px 10px" }}>
             <span
-              className="inline-flex items-center gap-2 text-xs font-medium px-2.5 py-1 rounded-full capitalize"
               style={{
-                background: "rgba(16,185,129,0.15)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                background: "rgba(16,185,129,.12)",
+                border: "1px solid rgba(16,185,129,.2)",
+                borderRadius: 20,
+                padding: "3px 10px",
                 color: "#34d399",
-                border: "1px solid rgba(16,185,129,0.2)",
+                fontSize: 11,
+                fontWeight: 600,
+                textTransform: "capitalize",
               }}
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: "#34d399",
+                }}
+              />
               {user?.role}
             </span>
           </div>
@@ -251,9 +420,46 @@ export default function DashboardLayout({
               logout();
               router.push("/login");
             }}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all w-full text-sm font-medium"
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "10px 12px",
+              borderRadius: 11,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              transition: "background .15s",
+              color: "rgba(255,255,255,.35)",
+              fontSize: 13,
+              fontWeight: 500,
+              fontFamily: "inherit",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background =
+                "rgba(239,68,68,.1)";
+              (e.currentTarget as HTMLButtonElement).style.color = "#fca5a5";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background =
+                "transparent";
+              (e.currentTarget as HTMLButtonElement).style.color =
+                "rgba(255,255,255,.35)";
+            }}
           >
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5">
+            <div
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 8,
+                background: "rgba(255,255,255,.05)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
               <LogOut size={14} />
             </div>
             Sign out
@@ -261,37 +467,60 @@ export default function DashboardLayout({
         </div>
       </aside>
 
-      {/* Main area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top header */}
+      {/* ════════════════════════════════
+          MAIN AREA
+      ════════════════════════════════ */}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          minWidth: 0,
+          overflow: "hidden",
+        }}
+      >
+        {/* topbar */}
         <header
-          className="h-16 flex items-center justify-between px-6 flex-shrink-0 bg-white"
           style={{
-            borderBottom: "1px solid #e8edf2",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+            height: TOPBAR_H,
+            background: "#fff",
+            borderBottom: "1px solid #e2e8f0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0 24px",
+            flexShrink: 0,
+            boxShadow: "0 1px 3px rgba(0,0,0,.04)",
           }}
         >
-          <div className="flex items-center gap-4">
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            {/* hamburger */}
             <button
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden text-gray-400 hover:text-gray-700 p-1"
+              className="lg-hide"
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "#64748b",
+                display: "flex",
+                padding: 4,
+              }}
             >
               <Menu size={20} />
             </button>
             <div>
-              <div className="flex items-center gap-2">
-                {currentItem && (
-                  <div
-                    className={`w-6 h-6 rounded-lg flex items-center justify-center ${currentItem.bg.replace("20", "10")}`}
-                  >
-                    <currentItem.icon size={12} className={currentItem.color} />
-                  </div>
-                )}
-                <h1 className="text-gray-900 font-bold text-base">
-                  {currentPage}
-                </h1>
-              </div>
-              <p className="text-gray-400 text-xs">
+              <p
+                style={{
+                  color: "#0f172a",
+                  fontWeight: 700,
+                  fontSize: 15,
+                  lineHeight: 1.2,
+                }}
+              >
+                {current.label}
+              </p>
+              <p style={{ color: "#94a3b8", fontSize: 12 }}>
                 {new Date().toLocaleDateString("en-ZA", {
                   weekday: "long",
                   day: "numeric",
@@ -302,32 +531,88 @@ export default function DashboardLayout({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100 font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Live
-            </div>
-            <button className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors border border-gray-200">
-              <Bell size={16} className="text-gray-500" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-blue-500 border-2 border-white" />
-            </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {/* live badge */}
             <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs text-white flex-shrink-0"
               style={{
-                background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                background: "#f0fdf4",
+                border: "1px solid #bbf7d0",
+                borderRadius: 20,
+                padding: "4px 12px",
               }}
             >
-              {user?.firstName?.[0]}
-              {user?.lastName?.[0]}
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: "50%",
+                  background: "#22c55e",
+                  boxShadow: "0 0 6px #22c55e",
+                  animation: "pulse 2s infinite",
+                }}
+              />
+              <span style={{ color: "#16a34a", fontSize: 12, fontWeight: 600 }}>
+                Live
+              </span>
+            </div>
+            <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}`}</style>
+
+            {/* bell */}
+            <button
+              style={{
+                position: "relative",
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+              }}
+            >
+              <Bell size={16} color="#64748b" />
+              <span
+                style={{
+                  position: "absolute",
+                  top: 7,
+                  right: 7,
+                  width: 7,
+                  height: 7,
+                  borderRadius: "50%",
+                  background: "#ef4444",
+                  border: "2px solid #fff",
+                }}
+              />
+            </button>
+
+            {/* avatar */}
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: "linear-gradient(135deg,#3b82f6,#8b5cf6)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#fff",
+                fontWeight: 700,
+                fontSize: 12,
+                flexShrink: 0,
+              }}
+            >
+              {initials}
             </div>
           </div>
         </header>
 
-        {/* Page content */}
-        <main
-          className="flex-1 overflow-auto"
-          style={{ background: "#f0f4f8" }}
-        >
+        {/* page content */}
+        <main style={{ flex: 1, overflowY: "auto", background: PAGE_BG }}>
           {children}
         </main>
       </div>
