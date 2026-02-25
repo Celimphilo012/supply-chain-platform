@@ -4,22 +4,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Plus, Truck, Mail, Phone, X, Building2 } from "lucide-react";
 
-function SkeletonCard() {
-  return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-6 animate-pulse">
-      <div className="flex items-start justify-between mb-4">
-        <div className="w-10 h-10 bg-gray-100 rounded-lg" />
-        <div className="w-14 h-5 bg-gray-100 rounded-full" />
-      </div>
-      <div className="h-4 bg-gray-100 rounded w-3/4 mb-2" />
-      <div className="h-3 bg-gray-100 rounded w-1/2 mb-4" />
-      <div className="space-y-2">
-        <div className="h-3 bg-gray-100 rounded w-2/3" />
-        <div className="h-3 bg-gray-100 rounded w-1/2" />
-      </div>
-    </div>
-  );
-}
+const SUPPLIER_COLORS = [
+  { gradient: "linear-gradient(135deg, #3b82f6, #2563eb)", bg: "#eff6ff" },
+  { gradient: "linear-gradient(135deg, #8b5cf6, #7c3aed)", bg: "#f5f3ff" },
+  { gradient: "linear-gradient(135deg, #10b981, #059669)", bg: "#f0fdf4" },
+  { gradient: "linear-gradient(135deg, #f59e0b, #d97706)", bg: "#fffbeb" },
+  { gradient: "linear-gradient(135deg, #ef4444, #dc2626)", bg: "#fef2f2" },
+  { gradient: "linear-gradient(135deg, #06b6d4, #0891b2)", bg: "#ecfeff" },
+];
 
 export default function SuppliersPage() {
   const queryClient = useQueryClient();
@@ -61,14 +53,18 @@ export default function SuppliersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Suppliers</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Suppliers</h1>
           <p className="text-gray-500 text-sm mt-0.5">
-            {activeCount} active supplier{activeCount !== 1 ? "s" : ""}
+            {activeCount} active supplier partners
           </p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
+          className="inline-flex items-center gap-2 text-white font-semibold px-5 py-2.5 rounded-2xl text-sm transition-all hover:opacity-90 active:scale-95"
+          style={{
+            background: "linear-gradient(135deg, #8b5cf6, #7c3aed)",
+            boxShadow: "0 4px 16px rgba(139,92,246,0.35)",
+          }}
         >
           <Plus size={16} />
           Add Supplier
@@ -76,108 +72,216 @@ export default function SuppliersPage() {
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {isLoading && [...Array(6)].map((_, i) => <SkeletonCard key={i} />)}
-
-        {suppliers?.map((supplier: any) => (
-          <div
-            key={supplier.id}
-            className="bg-white border border-gray-200 rounded-2xl p-6 hover:border-gray-300 hover:shadow-sm transition-all"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-                <Truck size={18} className="text-blue-600" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {isLoading &&
+          [...Array(6)].map((_, i) => (
+            <div
+              key={i}
+              className="bg-white rounded-3xl p-6 animate-pulse"
+              style={{ border: "1px solid #e8edf2" }}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-gray-100" />
+                <div className="w-16 h-5 rounded-full bg-gray-100" />
               </div>
-              <span
-                className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${
-                  supplier.isActive
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "bg-gray-100 text-gray-500"
-                }`}
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${supplier.isActive ? "bg-emerald-500" : "bg-gray-400"}`}
-                />
-                {supplier.isActive ? "Active" : "Inactive"}
-              </span>
+              <div className="h-5 bg-gray-100 rounded-xl w-3/4 mb-2" />
+              <div className="h-4 bg-gray-100 rounded-xl w-1/2 mb-5" />
+              <div className="space-y-2">
+                <div className="h-3 bg-gray-100 rounded-xl w-2/3" />
+                <div className="h-3 bg-gray-100 rounded-xl w-1/2" />
+              </div>
             </div>
+          ))}
 
-            <h3 className="font-semibold text-gray-900 mb-0.5">
-              {supplier.name}
-            </h3>
-            {supplier.contactName && (
-              <p className="text-sm text-gray-400 mb-4">
-                {supplier.contactName}
-              </p>
-            )}
-
-            <div className="space-y-2 mb-4">
-              {supplier.email && (
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <Mail size={13} className="text-gray-300 flex-shrink-0" />
-                  <span className="truncate">{supplier.email}</span>
+        {suppliers?.map((supplier: any, idx: number) => {
+          const color = SUPPLIER_COLORS[idx % SUPPLIER_COLORS.length];
+          return (
+            <div
+              key={supplier.id}
+              className="bg-white rounded-3xl overflow-hidden hover:shadow-lg transition-all group"
+              style={{
+                border: "1px solid #e8edf2",
+                boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
+              }}
+            >
+              {/* Colored top strip */}
+              <div className="h-2" style={{ background: color.gradient }} />
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: color.bg }}
+                  >
+                    <Truck
+                      size={20}
+                      style={{
+                        color: color.gradient.includes("#3b82f6")
+                          ? "#2563eb"
+                          : color.gradient.includes("#8b5cf6")
+                            ? "#7c3aed"
+                            : color.gradient.includes("#10b981")
+                              ? "#059669"
+                              : color.gradient.includes("#f59e0b")
+                                ? "#d97706"
+                                : color.gradient.includes("#ef4444")
+                                  ? "#dc2626"
+                                  : "#0891b2",
+                      }}
+                    />
+                  </div>
+                  <span
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold"
+                    style={
+                      supplier.isActive
+                        ? { background: "#f0fdf4", color: "#16a34a" }
+                        : { background: "#f8fafc", color: "#94a3b8" }
+                    }
+                  >
+                    <span
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{
+                        background: supplier.isActive ? "#22c55e" : "#94a3b8",
+                      }}
+                    />
+                    {supplier.isActive ? "Active" : "Inactive"}
+                  </span>
                 </div>
-              )}
-              {supplier.phone && (
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <Phone size={13} className="text-gray-300 flex-shrink-0" />
-                  <span>{supplier.phone}</span>
-                </div>
-              )}
-            </div>
 
-            <div className="pt-4 border-t border-gray-100 grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-gray-400 mb-0.5">Payment terms</p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {supplier.paymentTerms} days
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 mb-0.5">Lead time</p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {supplier.leadTimeDays
-                    ? `${supplier.leadTimeDays} days`
-                    : "—"}
-                </p>
+                <h3 className="font-bold text-gray-900 text-lg mb-0.5 group-hover:text-blue-600 transition-colors">
+                  {supplier.name}
+                </h3>
+                {supplier.contactName && (
+                  <p className="text-gray-400 text-sm mb-4">
+                    {supplier.contactName}
+                  </p>
+                )}
+
+                <div className="space-y-2 mb-5">
+                  {supplier.email && (
+                    <div className="flex items-center gap-2.5 text-sm text-gray-500">
+                      <div
+                        className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{ background: "#f8fafc" }}
+                      >
+                        <Mail size={12} className="text-gray-400" />
+                      </div>
+                      <span className="truncate">{supplier.email}</span>
+                    </div>
+                  )}
+                  {supplier.phone && (
+                    <div className="flex items-center gap-2.5 text-sm text-gray-500">
+                      <div
+                        className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{ background: "#f8fafc" }}
+                      >
+                        <Phone size={12} className="text-gray-400" />
+                      </div>
+                      <span>{supplier.phone}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  className="pt-4 grid grid-cols-2 gap-3"
+                  style={{ borderTop: "2px dashed #f1f5f9" }}
+                >
+                  <div
+                    className="rounded-xl p-3"
+                    style={{ background: "#f8fafc" }}
+                  >
+                    <p className="text-xs text-gray-400 font-medium mb-1">
+                      Payment
+                    </p>
+                    <p className="text-sm font-bold text-gray-900">
+                      {supplier.paymentTerms}d
+                    </p>
+                  </div>
+                  <div
+                    className="rounded-xl p-3"
+                    style={{ background: "#f8fafc" }}
+                  >
+                    <p className="text-xs text-gray-400 font-medium mb-1">
+                      Lead Time
+                    </p>
+                    <p className="text-sm font-bold text-gray-900">
+                      {supplier.leadTimeDays
+                        ? `${supplier.leadTimeDays}d`
+                        : "—"}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {!isLoading && (!suppliers || suppliers.length === 0) && (
-          <div className="col-span-full bg-white border border-gray-200 border-dashed rounded-2xl p-16 text-center">
-            <Building2 size={40} className="mx-auto text-gray-200 mb-3" />
-            <p className="text-gray-400 font-medium text-sm">
+          <div
+            className="col-span-full bg-white rounded-3xl p-16 text-center"
+            style={{ border: "2px dashed #e8edf2" }}
+          >
+            <div
+              className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-5"
+              style={{
+                background: "linear-gradient(135deg, #eff6ff, #f5f3ff)",
+              }}
+            >
+              <Building2 size={32} className="text-gray-300" />
+            </div>
+            <p className="text-gray-700 font-bold text-lg mb-2">
               No suppliers yet
             </p>
-            <p className="text-gray-300 text-xs mt-1">
-              Add your first supplier to get started
+            <p className="text-gray-400 text-sm mb-6">
+              Add your supplier partners to start creating purchase orders
             </p>
             <button
               onClick={() => setShowCreate(true)}
-              className="mt-4 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              className="inline-flex items-center gap-2 text-white font-semibold px-5 py-2.5 rounded-2xl text-sm"
+              style={{
+                background: "linear-gradient(135deg, #8b5cf6, #7c3aed)",
+              }}
             >
-              <Plus size={14} />
-              Add Supplier
+              <Plus size={16} />
+              Add First Supplier
             </button>
           </div>
         )}
       </div>
 
-      {/* Create Modal */}
+      {/* Modal */}
       {showCreate && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-gray-100">
-            <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
-              <h2 className="text-base font-semibold text-gray-900">
-                Add Supplier
-              </h2>
+        <div
+          className="fixed inset-0 flex items-center justify-center z-50 p-4"
+          style={{
+            background: "rgba(15,23,42,0.6)",
+            backdropFilter: "blur(8px)",
+          }}
+        >
+          <div
+            className="bg-white rounded-3xl w-full max-w-md"
+            style={{ boxShadow: "0 32px 80px rgba(0,0,0,0.25)" }}
+          >
+            <div
+              className="h-2 rounded-t-3xl"
+              style={{
+                background: "linear-gradient(135deg, #8b5cf6, #7c3aed)",
+              }}
+            />
+            <div
+              className="px-6 py-5 flex items-center justify-between"
+              style={{ borderBottom: "1px solid #f1f5f9" }}
+            >
+              <div>
+                <h2 className="font-bold text-gray-900">Add Supplier</h2>
+                <p className="text-gray-400 text-xs mt-0.5">
+                  Create a new supplier partner
+                </p>
+              </div>
               <button
                 onClick={() => setShowCreate(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
             <div className="px-6 py-5 space-y-4">
@@ -196,24 +300,22 @@ export default function SuppliersPage() {
                   placeholder: "Jane Smith",
                 },
                 {
-                  label: "Email",
+                  label: "Email Address",
                   key: "email",
                   type: "email",
                   placeholder: "jane@supplier.com",
                 },
                 {
-                  label: "Phone",
+                  label: "Phone Number",
                   key: "phone",
                   type: "text",
                   placeholder: "+27 11 555 0100",
                 },
               ].map((field) => (
                 <div key={field.key}>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    {field.label}
-                    {field.required && (
-                      <span className="text-red-400 ml-1">*</span>
-                    )}
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    {field.label}{" "}
+                    {field.required && <span className="text-red-400">*</span>}
                   </label>
                   <input
                     type={field.type}
@@ -222,13 +324,17 @@ export default function SuppliersPage() {
                       setForm((f) => ({ ...f, [field.key]: e.target.value }))
                     }
                     placeholder={field.placeholder}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 bg-gray-50"
+                    className="w-full rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-300 focus:outline-none transition-all"
+                    style={{
+                      background: "#f8fafc",
+                      border: "2px solid #f1f5f9",
+                    }}
                   />
                 </div>
               ))}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Payment Terms (days)
                   </label>
                   <input
@@ -240,11 +346,15 @@ export default function SuppliersPage() {
                         paymentTerms: parseInt(e.target.value) || 0,
                       }))
                     }
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 bg-gray-50"
+                    className="w-full rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none"
+                    style={{
+                      background: "#f8fafc",
+                      border: "2px solid #f1f5f9",
+                    }}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Lead Time (days)
                   </label>
                   <input
@@ -256,7 +366,11 @@ export default function SuppliersPage() {
                         leadTimeDays: parseInt(e.target.value) || 0,
                       }))
                     }
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 bg-gray-50"
+                    className="w-full rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none"
+                    style={{
+                      background: "#f8fafc",
+                      border: "2px solid #f1f5f9",
+                    }}
                   />
                 </div>
               </div>
@@ -264,14 +378,18 @@ export default function SuppliersPage() {
             <div className="flex gap-3 px-6 pb-6">
               <button
                 onClick={() => setShowCreate(false)}
-                className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
+                className="flex-1 py-3 rounded-2xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                style={{ border: "2px solid #f1f5f9" }}
               >
                 Cancel
               </button>
               <button
                 onClick={() => createMutation.mutate(form)}
                 disabled={!form.name || createMutation.isPending}
-                className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-medium transition-colors"
+                className="flex-1 py-3 rounded-2xl text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50"
+                style={{
+                  background: "linear-gradient(135deg, #8b5cf6, #7c3aed)",
+                }}
               >
                 {createMutation.isPending ? "Adding..." : "Add Supplier"}
               </button>

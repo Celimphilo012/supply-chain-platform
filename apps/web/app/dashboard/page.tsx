@@ -10,23 +10,9 @@ import {
   TrendingUp,
   Truck,
   ArrowUpRight,
-  ArrowDownRight,
+  ShoppingCart,
+  Activity,
 } from "lucide-react";
-
-function SkeletonRow() {
-  return (
-    <tr>
-      {[...Array(6)].map((_, i) => (
-        <td key={i} className="px-6 py-4">
-          <div
-            className="h-4 bg-gray-100 rounded animate-pulse"
-            style={{ width: `${60 + i * 10}%` }}
-          />
-        </td>
-      ))}
-    </tr>
-  );
-}
 
 export default function DashboardPage() {
   const queryClient = useQueryClient();
@@ -70,252 +56,267 @@ export default function DashboardPage() {
     ) ?? 0;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <KPICard
-          title="Total Products"
-          value={totalProducts}
-          icon={<Package size={18} />}
-          iconBg="bg-blue-50"
-          iconColor="text-blue-600"
-          trend="+12%"
-          trendUp={true}
-        />
-        <KPICard
-          title="Low Stock Alerts"
-          value={lowStockCount}
-          icon={<AlertTriangle size={18} />}
-          iconBg="bg-amber-50"
-          iconColor="text-amber-600"
-          alert={lowStockCount > 0}
-          trend={lowStockCount > 0 ? "Action needed" : "All good"}
-          trendUp={lowStockCount === 0}
-        />
-        <KPICard
-          title="Pending Orders"
-          value={pendingOrders}
-          icon={<Truck size={18} />}
-          iconBg="bg-purple-50"
-          iconColor="text-purple-600"
-          trend={`${pendingOrders} active`}
-          trendUp={true}
-        />
-        <KPICard
-          title="Stock Value"
-          value={`R${totalStockValue.toLocaleString("en-ZA", { minimumFractionDigits: 0 })}`}
-          icon={<TrendingUp size={18} />}
-          iconBg="bg-emerald-50"
-          iconColor="text-emerald-600"
-          trend="+8.2%"
-          trendUp={true}
-        />
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl p-5 text-white shadow-lg shadow-blue-500/25 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-8 translate-x-8" />
+          <div className="relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                <Package size={18} className="text-white" />
+              </div>
+              <span className="flex items-center gap-1 text-xs font-semibold bg-white/20 px-2 py-1 rounded-full">
+                <ArrowUpRight size={12} /> 12%
+              </span>
+            </div>
+            <p className="text-3xl font-bold">{totalProducts}</p>
+            <p className="text-blue-200 text-sm mt-1">Total Products</p>
+          </div>
+        </div>
+
+        <div
+          className={`bg-gradient-to-br ${lowStockCount > 0 ? "from-amber-500 to-orange-600 shadow-amber-500/25" : "from-emerald-500 to-emerald-700 shadow-emerald-500/25"} rounded-2xl p-5 text-white shadow-lg relative overflow-hidden`}
+        >
+          <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-8 translate-x-8" />
+          <div className="relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                <AlertTriangle size={18} className="text-white" />
+              </div>
+              <span className="text-xs font-semibold bg-white/20 px-2 py-1 rounded-full">
+                {lowStockCount > 0 ? "⚠ Alert" : "✓ Good"}
+              </span>
+            </div>
+            <p className="text-3xl font-bold">{lowStockCount}</p>
+            <p className="text-white/80 text-sm mt-1">Low Stock Alerts</p>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-purple-500 to-purple-700 rounded-2xl p-5 text-white shadow-lg shadow-purple-500/25 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-8 translate-x-8" />
+          <div className="relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                <ShoppingCart size={18} className="text-white" />
+              </div>
+              <span className="text-xs font-semibold bg-white/20 px-2 py-1 rounded-full">
+                Active
+              </span>
+            </div>
+            <p className="text-3xl font-bold">{pendingOrders}</p>
+            <p className="text-purple-200 text-sm mt-1">Pending Orders</p>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-teal-500 to-cyan-600 rounded-2xl p-5 text-white shadow-lg shadow-teal-500/25 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-8 translate-x-8" />
+          <div className="relative">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                <TrendingUp size={18} className="text-white" />
+              </div>
+              <span className="flex items-center gap-1 text-xs font-semibold bg-white/20 px-2 py-1 rounded-full">
+                <ArrowUpRight size={12} /> 8.2%
+              </span>
+            </div>
+            <p className="text-2xl font-bold">
+              R
+              {totalStockValue.toLocaleString("en-ZA", {
+                maximumFractionDigits: 0,
+              })}
+            </p>
+            <p className="text-teal-200 text-sm mt-1">Total Stock Value</p>
+          </div>
+        </div>
       </div>
 
-      {/* Low stock banner */}
       {lowStockCount > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-center gap-3">
-          <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
-            <AlertTriangle size={16} className="text-amber-600" />
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-4">
+          <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <AlertTriangle size={18} className="text-amber-600" />
           </div>
           <div>
-            <p className="text-amber-800 font-medium text-sm">
-              {lowStockCount} item{lowStockCount > 1 ? "s" : ""} below reorder
-              point
+            <p className="text-amber-800 font-semibold text-sm">
+              {lowStockCount} item{lowStockCount > 1 ? "s" : ""} require
+              attention
             </p>
             <p className="text-amber-600 text-xs mt-0.5">
-              Review inventory levels to avoid stockouts
+              Stock levels are below reorder points
             </p>
           </div>
         </div>
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Inventory Table */}
-        <div className="xl:col-span-2 bg-white rounded-2xl border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <div>
-              <h2 className="font-semibold text-gray-900 text-sm">
-                Stock Levels
-              </h2>
-              <p className="text-gray-400 text-xs mt-0.5">
-                {totalProducts} products tracked
-              </p>
+        <div className="xl:col-span-2 bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Package size={15} className="text-blue-600" />
+              </div>
+              <div>
+                <h2 className="font-bold text-gray-900 text-sm">
+                  Stock Levels
+                </h2>
+                <p className="text-gray-400 text-xs">
+                  {totalProducts} products tracked
+                </p>
+              </div>
             </div>
-            <span className="inline-flex items-center gap-1 text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-full">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+            <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-full font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Live
             </span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                <tr className="border-b border-gray-100 bg-gray-50/50">
+                  <th className="text-left px-6 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
                     Product
                   </th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  <th className="text-left px-6 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
                     Warehouse
                   </th>
-                  <th className="text-right px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    On Hand
+                  <th className="text-right px-6 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    Qty
                   </th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  <th className="text-left px-6 py-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
                     Status
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {invLoading &&
-                  [...Array(5)].map((_, i) => <SkeletonRow key={i} />)}
+                  [...Array(5)].map((_, i) => (
+                    <tr key={i}>
+                      {[...Array(4)].map((_, j) => (
+                        <td key={j} className="px-6 py-4">
+                          <div className="h-4 bg-gray-100 rounded animate-pulse" />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
                 {inventory?.slice(0, 8).map((inv: any) => {
                   const isLow =
                     inv.reorderPoint && inv.quantityOnHand <= inv.reorderPoint;
                   return (
                     <tr
                       key={inv.id}
-                      className="hover:bg-gray-50 transition-colors"
+                      className="hover:bg-blue-50/30 transition-colors"
                     >
                       <td className="px-6 py-3.5">
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-semibold text-gray-900">
                           {inv.product?.name}
                         </p>
                         <p className="text-xs text-gray-400 font-mono">
                           {inv.product?.sku}
                         </p>
                       </td>
-                      <td className="px-6 py-3.5 text-sm text-gray-500">
-                        {inv.warehouse?.name}
-                      </td>
-                      <td className="px-6 py-3.5 text-right">
-                        <span className="text-sm font-semibold text-gray-900">
-                          {inv.quantityOnHand}
+                      <td className="px-6 py-3.5">
+                        <span className="text-sm text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md">
+                          {inv.warehouse?.name}
                         </span>
+                      </td>
+                      <td className="px-6 py-3.5 text-right font-bold text-gray-900 text-sm">
+                        {inv.quantityOnHand}
                       </td>
                       <td className="px-6 py-3.5">
                         <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
                             isLow
-                              ? "bg-red-50 text-red-700"
-                              : "bg-emerald-50 text-emerald-700"
+                              ? "bg-red-100 text-red-700 border-red-200"
+                              : "bg-emerald-100 text-emerald-700 border-emerald-200"
                           }`}
                         >
                           <span
                             className={`w-1.5 h-1.5 rounded-full ${isLow ? "bg-red-500" : "bg-emerald-500"}`}
                           />
-                          {isLow ? "Low Stock" : "In Stock"}
+                          {isLow ? "Low" : "OK"}
                         </span>
                       </td>
                     </tr>
                   );
                 })}
-                {!invLoading && (!inventory || inventory.length === 0) && (
-                  <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center">
-                      <Package
-                        size={32}
-                        className="mx-auto text-gray-200 mb-3"
-                      />
-                      <p className="text-gray-400 text-sm">
-                        No inventory records yet
-                      </p>
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* Recent POs */}
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h2 className="font-semibold text-gray-900 text-sm">
-              Recent Orders
-            </h2>
-            <p className="text-gray-400 text-xs mt-0.5">
-              {orders?.length ?? 0} total orders
-            </p>
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+          <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center gap-3">
+            <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+              <ShoppingCart size={15} className="text-purple-600" />
+            </div>
+            <div>
+              <h2 className="font-bold text-gray-900 text-sm">Recent Orders</h2>
+              <p className="text-gray-400 text-xs">
+                {orders?.length ?? 0} total
+              </p>
+            </div>
           </div>
           <div className="divide-y divide-gray-50">
-            {orders?.slice(0, 8).map((order: any) => (
-              <div
-                key={order.id}
-                className="px-6 py-3.5 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
+            {orders?.slice(0, 8).map((order: any) => {
+              const styles: Record<string, string> = {
+                draft: "bg-gray-100 text-gray-600 border-gray-200",
+                pending_approval:
+                  "bg-amber-100 text-amber-700 border-amber-200",
+                approved: "bg-blue-100 text-blue-700 border-blue-200",
+                sent: "bg-purple-100 text-purple-700 border-purple-200",
+                received: "bg-emerald-100 text-emerald-700 border-emerald-200",
+                cancelled: "bg-red-100 text-red-700 border-red-200",
+              };
+              return (
+                <div
+                  key={order.id}
+                  className="px-5 py-3.5 hover:bg-purple-50/30 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <p className="text-sm font-semibold text-gray-900 truncate">
                       {order.supplier?.name}
                     </p>
-                    <p className="text-xs text-gray-400 font-mono mt-0.5">
+                    <span
+                      className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold capitalize flex-shrink-0 border ${styles[order.status] ?? styles.draft}`}
+                    >
+                      {order.status.replace("_", " ")}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-gray-400 font-mono">
                       {order.poNumber}
                     </p>
+                    <p className="text-sm font-bold text-gray-800">
+                      R{Number(order.totalAmount).toLocaleString()}
+                    </p>
                   </div>
-                  <POStatusBadge status={order.status} />
                 </div>
-                <p className="text-sm font-semibold text-gray-700 mt-1.5">
-                  R{Number(order.totalAmount).toLocaleString()}
-                </p>
-              </div>
-            ))}
+              );
+            })}
             {(!orders || orders.length === 0) && (
               <div className="px-6 py-12 text-center">
                 <Truck size={32} className="mx-auto text-gray-200 mb-3" />
-                <p className="text-gray-400 text-sm">No purchase orders yet</p>
+                <p className="text-gray-400 text-sm">No orders yet</p>
               </div>
             )}
           </div>
         </div>
       </div>
-    </div>
-  );
-}
 
-function KPICard({
-  title,
-  value,
-  icon,
-  iconBg,
-  iconColor,
-  trend,
-  trendUp,
-  alert = false,
-}: any) {
-  return (
-    <div
-      className={`bg-white rounded-2xl border ${alert ? "border-amber-200" : "border-gray-200"} p-5`}
-    >
-      <div className="flex items-center justify-between mb-4">
-        <div className={`${iconBg} ${iconColor} p-2 rounded-lg`}>{icon}</div>
-        <span
-          className={`flex items-center gap-1 text-xs font-medium ${trendUp ? "text-emerald-600" : "text-red-500"}`}
-        >
-          {trendUp ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-          {trend}
-        </span>
+      <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-5 flex items-center gap-4 shadow-xl">
+        <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center flex-shrink-0">
+          <Activity size={18} className="text-white" />
+        </div>
+        <div className="flex-1">
+          <p className="text-white font-semibold text-sm">System Status</p>
+          <p className="text-slate-400 text-xs mt-0.5">
+            All services operational · WebSocket connected
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-emerald-400 text-xs font-semibold">Live</span>
+        </div>
       </div>
-      <p className="text-2xl font-bold text-gray-900 tracking-tight">{value}</p>
-      <p className="text-xs text-gray-400 mt-1">{title}</p>
     </div>
-  );
-}
-
-function POStatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    draft: "bg-gray-100 text-gray-600",
-    pending_approval: "bg-amber-50 text-amber-700",
-    approved: "bg-blue-50 text-blue-700",
-    sent: "bg-purple-50 text-purple-700",
-    partial: "bg-orange-50 text-orange-700",
-    received: "bg-emerald-50 text-emerald-700",
-    cancelled: "bg-red-50 text-red-700",
-  };
-  return (
-    <span
-      className={`inline-flex px-2 py-0.5 rounded-md text-xs font-medium capitalize flex-shrink-0 ${styles[status] ?? "bg-gray-100 text-gray-600"}`}
-    >
-      {status.replace("_", " ")}
-    </span>
   );
 }
