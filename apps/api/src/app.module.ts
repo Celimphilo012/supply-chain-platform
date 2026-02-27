@@ -1,3 +1,4 @@
+// apps/api/src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -13,8 +14,7 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { ForecastingModule } from './modules/forecasting/forecasting.module';
-
-// add RealtimeModule to imports array
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -38,12 +38,7 @@ import { ForecastingModule } from './modules/forecasting/forecasting.module';
             : false,
       }),
     }),
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60000,
-        limit: 100,
-      },
-    ]),
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     WinstonModule.forRoot({
       transports: [
         new winston.transports.Console({
@@ -64,12 +59,8 @@ import { ForecastingModule } from './modules/forecasting/forecasting.module';
     SuppliersModule,
     RealtimeModule,
     ForecastingModule,
+    AdminModule,
   ],
-  providers: [
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
-  ],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

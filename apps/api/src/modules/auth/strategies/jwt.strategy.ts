@@ -1,3 +1,4 @@
+// apps/api/src/modules/auth/strategies/jwt.strategy.ts
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
@@ -10,7 +11,7 @@ export interface JwtPayload {
   sub: string;
   email: string;
   role: string;
-  organizationId: string;
+  organizationId: string | null; // null for super_admin who has no org
 }
 
 @Injectable()

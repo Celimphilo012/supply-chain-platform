@@ -5,299 +5,279 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import api from "@/lib/api";
-import { useAuthStore } from "@/store/auth.store";
 import { connectSocket } from "@/lib/socket";
+import { useAuthStore } from "@/store/auth.store";
 
 const schema = z.object({
-  email: z.string().email("Invalid email address"),
+  email: z.string().email("Enter a valid email"),
   password: z.string().min(1, "Password is required"),
 });
-type Form = z.infer<typeof schema>;
+type FormData = z.infer<typeof schema>;
 
 export default function LoginPage() {
   const router = useRouter();
-  const setAuth = useAuthStore((s) => s.setAuth);
-  const [serverError, setServerError] = useState("");
+  const { setAuth } = useAuthStore();
   const [showPass, setShowPass] = useState(false);
+  const [serverError, setServerError] = useState("");
 
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<Form>({ resolver: zodResolver(schema) });
+  } = useForm<FormData>({
+    resolver: zodResolver(schema),
+  });
 
-  const onSubmit = async (data: Form) => {
+  const onSubmit = async (data: FormData) => {
+    setServerError("");
     try {
-      setServerError("");
       const res = await api.post("/auth/login", data);
-      setAuth(res.data.accessToken, res.data.user, res.data.organization);
+      const { user, organization, accessToken } = res.data;
+      setAuth(accessToken, user, organization ?? null); // ← correct order: token, user, org
       connectSocket();
-      router.push("/dashboard");
+
+      // Role-based redirect
+      if (user.role === "super_admin") {
+        router.push("/admin");
+      } else {
+        router.push("/dashboard");
+      }
     } catch (err: any) {
       setServerError(
-        err.response?.data?.message || "Invalid email or password",
+        err?.response?.data?.message ?? "Invalid email or password",
       );
     }
   };
 
+  // Styles (identical to current login design)
   const inputBase: React.CSSProperties = {
     width: "100%",
-    padding: "14px 16px 14px 46px",
-    background: "rgba(255,255,255,0.06)",
-    border: "1.5px solid rgba(255,255,255,0.12)",
-    borderRadius: "12px",
+    padding: "13px 14px 13px 44px",
+    background: "rgba(255,255,255,.06)",
+    border: "1.5px solid rgba(255,255,255,.12)",
+    borderRadius: 12,
     color: "#fff",
-    fontSize: "15px",
+    fontSize: 14,
     fontFamily: "inherit",
     outline: "none",
-    transition: "border-color .2s, background .2s",
+    transition: "border-color .15s, background .15s",
+    boxSizing: "border-box",
   };
 
   return (
-    /* ── full-page centering ── */
     <div
       style={{
         minHeight: "100vh",
-        width: "100%",
+        background: "#e5e7eb",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "24px",
-        background: "#e5e7eb" /* light gray page bg */,
+        padding: 16,
         fontFamily: "'Outfit', sans-serif",
       }}
     >
-      {/* ── card ── */}
       <div
         style={{
+          background: "#1a1a2e",
+          borderRadius: 20,
+          padding: "clamp(2rem,5vw,2.75rem)",
           width: "100%",
-          maxWidth: "440px",
-          background: "#1a1a2e" /* deep dark card */,
-          borderRadius: "20px",
-          padding: "clamp(2rem, 5vw, 2.75rem)",
-          boxShadow: "0 24px 64px rgba(0,0,0,0.35)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: "0",
+          maxWidth: 440,
+          boxShadow: "0 24px 64px rgba(0,0,0,.25)",
         }}
       >
-        {/* ── icon ── */}
+        {/* icon */}
         <div
           style={{
-            width: "70px",
-            height: "70px",
+            width: 70,
+            height: 70,
             borderRadius: "50%",
-            background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+            background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            marginBottom: "20px",
-            boxShadow: "0 8px 32px rgba(99,102,241,0.45)",
+            margin: "0 auto 20px",
+            boxShadow: "0 8px 24px rgba(99,102,241,.4)",
           }}
         >
           <svg
-            width="32"
-            height="32"
+            width="28"
+            height="28"
             viewBox="0 0 24 24"
             fill="none"
             stroke="white"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+            strokeWidth="2.2"
           >
             <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
             <polyline points="9,22 9,12 15,12 15,22" />
           </svg>
         </div>
 
-        {/* ── title ── */}
         <h1
           style={{
-            color: "#ffffff",
-            fontSize: "26px",
-            fontWeight: 700,
-            letterSpacing: "-0.3px",
-            marginBottom: "6px",
             textAlign: "center",
+            color: "#fff",
+            fontSize: 22,
+            fontWeight: 700,
+            marginBottom: 6,
           }}
         >
           Supply Chain Pro
         </h1>
         <p
           style={{
-            color: "rgba(255,255,255,0.4)",
-            fontSize: "14px",
-            marginBottom: "32px",
             textAlign: "center",
+            color: "rgba(255,255,255,.4)",
+            fontSize: 14,
+            marginBottom: 28,
           }}
         >
           Sign in to your workspace
         </p>
 
-        {/* ── form ── */}
+        {/* server error */}
+        {serverError && (
+          <div
+            style={{
+              background: "rgba(239,68,68,.12)",
+              border: "1px solid rgba(239,68,68,.3)",
+              borderRadius: 10,
+              padding: "10px 14px",
+              marginBottom: 18,
+              color: "#fca5a5",
+              fontSize: 13,
+            }}
+          >
+            {serverError}
+          </div>
+        )}
+
         <form
           onSubmit={handleSubmit(onSubmit)}
-          noValidate
-          style={{
-            width: "100%",
-            display: "flex",
-            flexDirection: "column",
-            gap: "14px",
-          }}
+          style={{ display: "flex", flexDirection: "column", gap: 14 }}
         >
-          {/* Email */}
+          {/* email */}
           <div style={{ position: "relative" }}>
-            <span
+            <svg
               style={{
                 position: "absolute",
-                left: "14px",
+                left: 14,
                 top: "50%",
                 transform: "translateY(-50%)",
-                display: "flex",
                 pointerEvents: "none",
               }}
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="rgba(255,255,255,.35)"
+              strokeWidth="2"
             >
-              <svg
-                width="17"
-                height="17"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="rgba(255,255,255,0.35)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <rect x="2" y="4" width="20" height="16" rx="2" />
-                <path d="M22 7l-10 7L2 7" />
-              </svg>
-            </span>
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+              <polyline points="22,6 12,13 2,6" />
+            </svg>
             <input
               {...register("email")}
               type="email"
-              autoComplete="email"
-              placeholder="Email Address"
+              placeholder="Email address"
               style={{
                 ...inputBase,
-                borderColor: errors.email
-                  ? "#f87171"
-                  : "rgba(255,255,255,0.12)",
+                ...(errors.email ? { borderColor: "#f87171" } : {}),
               }}
               onFocus={(e) => {
                 e.currentTarget.style.borderColor = "#818cf8";
-                e.currentTarget.style.background = "rgba(255,255,255,0.09)";
+                e.currentTarget.style.background = "rgba(255,255,255,.09)";
               }}
               onBlur={(e) => {
                 e.currentTarget.style.borderColor = errors.email
                   ? "#f87171"
-                  : "rgba(255,255,255,0.12)";
-                e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+                  : "rgba(255,255,255,.12)";
+                e.currentTarget.style.background = "rgba(255,255,255,.06)";
               }}
             />
             {errors.email && (
-              <p
-                style={{
-                  color: "#f87171",
-                  fontSize: "12px",
-                  marginTop: "5px",
-                  paddingLeft: "4px",
-                }}
-              >
+              <p style={{ color: "#f87171", fontSize: 12, marginTop: 4 }}>
                 {errors.email.message}
               </p>
             )}
           </div>
 
-          {/* Password */}
+          {/* password */}
           <div style={{ position: "relative" }}>
-            <span
+            <svg
               style={{
                 position: "absolute",
-                left: "14px",
-                top: errors.password ? "calc(50% - 10px)" : "50%",
+                left: 14,
+                top: errors.password ? "38%" : "50%",
                 transform: "translateY(-50%)",
-                display: "flex",
                 pointerEvents: "none",
               }}
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="rgba(255,255,255,.35)"
+              strokeWidth="2"
             >
-              <svg
-                width="17"
-                height="17"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="rgba(255,255,255,0.35)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0110 0v4" />
-              </svg>
-            </span>
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0110 0v4" />
+            </svg>
             <input
               {...register("password")}
               type={showPass ? "text" : "password"}
-              autoComplete="current-password"
               placeholder="Password"
               style={{
                 ...inputBase,
-                paddingRight: "48px",
-                borderColor: errors.password
-                  ? "#f87171"
-                  : "rgba(255,255,255,0.12)",
+                paddingRight: 44,
+                ...(errors.password ? { borderColor: "#f87171" } : {}),
               }}
               onFocus={(e) => {
                 e.currentTarget.style.borderColor = "#818cf8";
-                e.currentTarget.style.background = "rgba(255,255,255,0.09)";
+                e.currentTarget.style.background = "rgba(255,255,255,.09)";
               }}
               onBlur={(e) => {
                 e.currentTarget.style.borderColor = errors.password
                   ? "#f87171"
-                  : "rgba(255,255,255,0.12)";
-                e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+                  : "rgba(255,255,255,.12)";
+                e.currentTarget.style.background = "rgba(255,255,255,.06)";
               }}
             />
             <button
               type="button"
-              onClick={() => setShowPass((v) => !v)}
+              onClick={() => setShowPass((p) => !p)}
               style={{
                 position: "absolute",
-                right: "14px",
-                top: "50%",
+                right: 14,
+                top: errors.password ? "38%" : "50%",
                 transform: "translateY(-50%)",
                 background: "none",
                 border: "none",
                 cursor: "pointer",
-                color: "rgba(255,255,255,0.35)",
+                color: "rgba(255,255,255,.35)",
+                padding: 0,
                 display: "flex",
-                padding: "4px",
               }}
             >
               {showPass ? (
                 <svg
-                  width="17"
-                  height="17"
+                  width="16"
+                  height="16"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
                 >
-                  <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94" />
-                  <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19" />
+                  <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
                   <line x1="1" y1="1" x2="23" y2="23" />
                 </svg>
               ) : (
                 <svg
-                  width="17"
-                  height="17"
+                  width="16"
+                  height="16"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
                 >
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                   <circle cx="12" cy="12" r="3" />
@@ -305,99 +285,74 @@ export default function LoginPage() {
               )}
             </button>
             {errors.password && (
-              <p
-                style={{
-                  color: "#f87171",
-                  fontSize: "12px",
-                  marginTop: "5px",
-                  paddingLeft: "4px",
-                }}
-              >
+              <p style={{ color: "#f87171", fontSize: 12, marginTop: 4 }}>
                 {errors.password.message}
               </p>
             )}
           </div>
 
-          {/* Server error */}
-          {serverError && (
-            <div
-              style={{
-                background: "rgba(239,68,68,0.12)",
-                border: "1px solid rgba(239,68,68,0.3)",
-                borderRadius: "10px",
-                padding: "11px 14px",
-                color: "#fca5a5",
-                fontSize: "13px",
-                textAlign: "center",
-              }}
-            >
-              {serverError}
-            </div>
-          )}
-
-          {/* Submit */}
+          {/* submit */}
           <button
             type="submit"
             disabled={isSubmitting}
             style={{
               width: "100%",
-              padding: "15px",
-              marginTop: "4px",
-              background: isSubmitting ? "rgba(255,255,255,0.7)" : "#ffffff",
-              border: "none",
-              borderRadius: "12px",
-              color: isSubmitting ? "#666" : "#1a1a2e",
-              fontSize: "15px",
+              padding: 15,
+              borderRadius: 12,
+              background: "#fff",
+              color: "#1a1a2e",
               fontWeight: 700,
-              fontFamily: "inherit",
+              fontSize: 15,
+              border: "none",
               cursor: isSubmitting ? "not-allowed" : "pointer",
+              opacity: isSubmitting ? 0.7 : 1,
+              fontFamily: "inherit",
+              marginTop: 4,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: "8px",
-              transition: "opacity .2s, transform .1s",
-              boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
+              gap: 8,
+              transition: "opacity .15s",
             }}
             onMouseEnter={(e) => {
-              if (!isSubmitting) e.currentTarget.style.opacity = "0.92";
+              if (!isSubmitting) e.currentTarget.style.opacity = ".92";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.opacity = "1";
+              if (!isSubmitting) e.currentTarget.style.opacity = "1";
             }}
           >
             {isSubmitting ? (
               <>
-                <svg
-                  className="animate-spin"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                >
-                  <path d="M21 12a9 9 0 11-6.219-8.56" />
-                </svg>
+                <div
+                  style={{
+                    width: 16,
+                    height: 16,
+                    border: "2px solid rgba(26,26,46,.2)",
+                    borderTopColor: "#1a1a2e",
+                    borderRadius: "50%",
+                    animation: "spin .7s linear infinite",
+                  }}
+                />{" "}
                 Signing in…
               </>
             ) : (
-              "Sign In"
+              "Sign in"
             )}
           </button>
         </form>
 
-        {/* Footer */}
         <p
           style={{
-            marginTop: "24px",
-            color: "rgba(255,255,255,0.2)",
-            fontSize: "12px",
             textAlign: "center",
+            color: "rgba(255,255,255,.2)",
+            fontSize: 12,
+            marginTop: 28,
           }}
         >
-          © {new Date().getFullYear()} Supply Chain Pro. All rights reserved.
+          © {new Date().getFullYear()} Supply Chain Pro
         </p>
       </div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { BaseEntity } from '../../../common/entities/base.entity';
 import { Organization } from '../../organizations/entities/organization.entity';
 
 export enum UserRole {
+  SUPER_ADMIN = 'super_admin',
   OWNER = 'owner',
   ADMIN = 'admin',
   MANAGER = 'manager',
@@ -13,10 +14,10 @@ export enum UserRole {
 
 @Entity('users')
 export class User extends BaseEntity {
-  @Column({ name: 'organization_id' })
+  @Column({ name: 'organization_id', type: 'uuid', nullable: true })
   organizationId: string;
 
-  @ManyToOne(() => Organization, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Organization, { onDelete: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'organization_id' })
   organization: Organization;
 
@@ -24,7 +25,7 @@ export class User extends BaseEntity {
   email: string;
 
   @Column({ name: 'password_hash', length: 255 })
-  @Exclude() // Never include in API responses
+  @Exclude()
   passwordHash: string;
 
   @Column({

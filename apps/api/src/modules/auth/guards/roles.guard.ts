@@ -17,8 +17,11 @@ export class RolesGuard implements CanActivate {
 
     const { user } = context.switchToHttp().getRequest();
 
+    // super_admin bypasses ALL role checks — full platform access
+    if (user.role === UserRole.SUPER_ADMIN) return true;
+
     // Role hierarchy: owner > admin > manager > viewer
-    const roleHierarchy = {
+    const roleHierarchy: Record<string, number> = {
       [UserRole.OWNER]: 4,
       [UserRole.ADMIN]: 3,
       [UserRole.MANAGER]: 2,
@@ -26,6 +29,8 @@ export class RolesGuard implements CanActivate {
     };
 
     const userLevel = roleHierarchy[user.role as UserRole] ?? 0;
-    return requiredRoles.some((role) => userLevel >= roleHierarchy[role]);
+    return requiredRoles.some(
+      (role) => userLevel >= (roleHierarchy[role] ?? 0),
+    );
   }
 }

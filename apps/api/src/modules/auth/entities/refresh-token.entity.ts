@@ -11,8 +11,14 @@ import { User } from '../../users/entities/user.entity';
 
 @Entity('refresh_tokens')
 export class RefreshToken {
+  // Does NOT extend BaseEntity — refresh_tokens has different columns
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
+  createdAt: Date;
+
+  // No updatedAt — this table doesn't have that column
 
   @Column({ name: 'user_id' })
   userId: string;
@@ -29,7 +35,4 @@ export class RefreshToken {
 
   @Column({ name: 'is_revoked', default: false })
   isRevoked: boolean;
-
-  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
-  createdAt: Date;
 }

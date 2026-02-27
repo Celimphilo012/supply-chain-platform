@@ -3,7 +3,6 @@ import {
   Injectable,
   ConflictException,
   UnauthorizedException,
-  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
@@ -32,14 +31,11 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
-    // Check if email already exists
     const existing = await this.userRepository.findOne({
       where: { email: dto.email },
     });
     if (existing) throw new ConflictException('Email already registered');
 
-    // Use a transaction — create org + user atomically
-    // Hash password before transaction to keep transaction short
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
     const { savedUser, savedOrg } = await this.dataSource.transaction(
@@ -60,12 +56,10 @@ export class AuthService {
           lastName: dto.lastName,
         });
         const savedUser = await manager.save(user);
-
         return { savedUser, savedOrg };
       },
     );
 
-    // Store refresh token AFTER transaction commits — user now exists in DB
     const tokens = await this.generateTokens(savedUser);
     await this.storeRefreshToken(savedUser.id, tokens.refreshToken);
 
@@ -87,7 +81,6 @@ export class AuthService {
     const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!passwordValid) throw new UnauthorizedException('Invalid credentials');
 
-    // Update last login timestamp
     await this.userRepository.update(user.id, { lastLoginAt: new Date() });
 
     const tokens = await this.generateTokens(user);
@@ -95,7 +88,7 @@ export class AuthService {
 
     return {
       user: this.sanitizeUser(user),
-      organization: user.organization,
+      organization: user.organization ?? null, // null-safe for super_admin
       ...tokens,
     };
   }
@@ -104,11 +97,7 @@ export class AuthService {
     const tokenHash = this.hashToken(rawRefreshToken);
 
     const storedToken = await this.refreshTokenRepository.findOne({
-      where: {
-        userId,
-        tokenHash,
-        isRevoked: false,
-      },
+      where: { userId, tokenHash, isRevoked: false },
     });
 
     if (!storedToken || storedToken.expiresAt < new Date()) {
@@ -120,12 +109,10 @@ export class AuthService {
     });
     if (!user) throw new UnauthorizedException();
 
-    // Revoke old token (rotation)
     await this.refreshTokenRepository.update(storedToken.id, {
       isRevoked: true,
     });
 
-    // Issue new token pair
     const tokens = await this.generateTokens(user);
     await this.storeRefreshToken(user.id, tokens.refreshToken);
 
@@ -140,14 +127,14 @@ export class AuthService {
     );
   }
 
-  // ─── Private Helpers ───────────────────────────────────────
+  // ── Private Helpers ───────────────────────────────────────────────────
 
   private async generateTokens(user: User) {
     const payload = {
       sub: user.id,
       email: user.email,
       role: user.role,
-      organizationId: user.organizationId,
+      organizationId: user.organizationId ?? null, // null-safe for super_admin
     };
 
     const [accessToken, refreshToken] = await Promise.all([
@@ -167,8 +154,7 @@ export class AuthService {
   private async storeRefreshToken(userId: string, rawToken: string) {
     const tokenHash = this.hashToken(rawToken);
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
-
+    expiresAt.setDate(expiresAt.getDate() + 7);
     const token = this.refreshTokenRepository.create({
       userId,
       tokenHash,

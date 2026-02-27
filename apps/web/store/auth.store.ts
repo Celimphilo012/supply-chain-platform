@@ -1,4 +1,5 @@
-﻿import { create } from 'zustand';
+﻿// apps/web/store/auth.store.ts
+import { create } from "zustand";
 
 interface User {
   id: string;
@@ -6,7 +7,7 @@ interface User {
   role: string;
   firstName: string;
   lastName: string;
-  organizationId: string;
+  organizationId: string | null;
 }
 
 interface Organization {
@@ -21,27 +22,34 @@ interface AuthState {
   user: User | null;
   organization: Organization | null;
   isAuthenticated: boolean;
-  setAuth: (token: string, user: User, org: Organization) => void;
+  setAuth: (token: string, user: User, org: Organization | null) => void; // ← null-safe
   setAccessToken: (token: string) => void;
   logout: () => void;
   loadFromStorage: () => void;
 }
 
-const STORAGE_KEY = 'sc_auth';
+const STORAGE_KEY = "sc_auth";
 
 export const useAuthStore = create<AuthState>((set) => ({
   accessToken: null,
   user: null,
   organization: null,
   isAuthenticated: false,
+
   setAuth: (token, user, org) => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, user, org }));
     }
-    set({ accessToken: token, user, organization: org, isAuthenticated: true });
+    set({
+      accessToken: token,
+      user,
+      organization: org ?? null,
+      isAuthenticated: true,
+    });
   },
+
   setAccessToken: (token) => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
@@ -50,20 +58,32 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
     set({ accessToken: token });
   },
+
   logout: () => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       localStorage.removeItem(STORAGE_KEY);
     }
-    set({ accessToken: null, user: null, organization: null, isAuthenticated: false });
+    set({
+      accessToken: null,
+      user: null,
+      organization: null,
+      isAuthenticated: false,
+    });
   },
+
   loadFromStorage: () => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       try {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
           const { token, user, org } = JSON.parse(stored);
           if (token && user) {
-            set({ accessToken: token, user, organization: org, isAuthenticated: true });
+            set({
+              accessToken: token,
+              user,
+              organization: org ?? null,
+              isAuthenticated: true,
+            });
           }
         }
       } catch (e) {
