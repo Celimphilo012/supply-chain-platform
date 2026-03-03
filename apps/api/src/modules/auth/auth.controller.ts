@@ -19,6 +19,8 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RefreshAuthGuard } from './guards/refresh-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { User } from '../users/entities/user.entity';
+import { Patch } from '@nestjs/common'; // add Patch to existing import
+import { UpdateProfileDto, ChangePasswordDto } from './dto/update-profile.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -83,6 +85,19 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   getMe(@CurrentUser() user: User) {
     return user;
+  }
+
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  updateProfile(@CurrentUser() user: User, @Body() dto: UpdateProfileDto) {
+    return this.authService.updateProfile(user.id, dto);
+  }
+
+  @Patch('me/password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  changePassword(@CurrentUser() user: User, @Body() dto: ChangePasswordDto) {
+    return this.authService.changePassword(user.id, dto);
   }
 
   // ─── Helper ────────────────────────────────────────────────

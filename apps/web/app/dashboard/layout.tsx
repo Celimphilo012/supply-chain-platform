@@ -9,11 +9,12 @@ import {
   Truck,
   ShoppingCart,
   TrendingUp,
-Warehouse,
+  Warehouse,
   LogOut,
   Menu,
   X,
   Bell,
+  Settings,
 } from "lucide-react";
 
 const NAV = [
@@ -47,18 +48,24 @@ const NAV = [
     icon: TrendingUp,
     accent: "#ec4899",
   },
-{
-href: "/dashboard/warehouses",
-label: "Warehouses",
-icon: Warehouse,
-accent: "a11d48",
-},
-{
-href: "/dashboard/products",
-label: "Products",
-icon: Package,
-accent: "#10b981",
-},
+  {
+    href: "/dashboard/warehouses",
+    label: "Warehouses",
+    icon: Warehouse,
+    accent: "a11d48",
+  },
+  {
+    href: "/dashboard/products",
+    label: "Products",
+    icon: Package,
+    accent: "#10b981",
+  },
+  {
+    href: "/dashboard/settings",
+    label: "Settings",
+    icon: Settings,
+    accent: "#6366f1",
+  },
 ];
 
 const SIDEBAR_BG = "#0f172a";

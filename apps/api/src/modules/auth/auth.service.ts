@@ -15,6 +15,7 @@ import { Organization } from '../organizations/entities/organization.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { UpdateProfileDto, ChangePasswordDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class AuthService {
@@ -125,6 +126,29 @@ export class AuthService {
       { userId, tokenHash },
       { isRevoked: true },
     );
+  }
+
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    await this.userRepository.update(userId, {
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+    });
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    const { passwordHash, ...safe } = user as any;
+    return safe;
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('User not found');
+
+    const valid = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+    if (!valid)
+      throw new UnauthorizedException('Current password is incorrect');
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 12);
+    await this.userRepository.update(userId, { passwordHash });
+    return { message: 'Password updated successfully' };
   }
 
   // ── Private Helpers ───────────────────────────────────────────────────
