@@ -9,6 +9,7 @@ import {
   Truck,
   ShoppingCart,
   TrendingUp,
+Warehouse,
   LogOut,
   Menu,
   X,
@@ -46,6 +47,18 @@ const NAV = [
     icon: TrendingUp,
     accent: "#ec4899",
   },
+{
+href: "/dashboard/warehouses",
+label: "Warehouses",
+icon: Warehouse,
+accent: "a11d48",
+},
+{
+href: "/dashboard/products",
+label: "Products",
+icon: Package,
+accent: "#10b981",
+},
 ];
 
 const SIDEBAR_BG = "#0f172a";
