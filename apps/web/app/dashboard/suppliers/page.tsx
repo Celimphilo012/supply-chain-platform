@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { Plus, Truck, Mail, Phone, X, Building2 } from "lucide-react";
+import { Plus, Truck, Mail, Phone, X, Building2, Send } from "lucide-react";
 
 // ── colour palette cycling per card ───────────────────────────────────────
 const ACCENTS = [
@@ -150,9 +150,15 @@ function SkeletonCard() {
 function SupplierCard({
   supplier,
   accent,
+  onInvite,
 }: {
   supplier: any;
   accent: (typeof ACCENTS)[0];
+  onInvite: (s: {
+    supplierId: string;
+    supplierName: string;
+    email: string;
+  }) => void;
 }) {
   const initials = supplier.name
     .split(" ")
@@ -184,11 +190,9 @@ function SupplierCard({
         (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
       }}
     >
-      {/* colour top bar */}
       <div style={{ height: 5, background: accent.grad }} />
 
       <div style={{ padding: 20 }}>
-        {/* avatar + status */}
         <div
           style={{
             display: "flex",
@@ -240,7 +244,6 @@ function SupplierCard({
           </span>
         </div>
 
-        {/* name */}
         <p
           style={{
             fontSize: 15,
@@ -258,7 +261,6 @@ function SupplierCard({
           </p>
         )}
 
-        {/* contact details */}
         <div
           style={{
             display: "flex",
@@ -321,7 +323,6 @@ function SupplierCard({
           )}
         </div>
 
-        {/* payment + lead time */}
         <div
           style={{
             display: "grid",
@@ -406,6 +407,36 @@ function SupplierCard({
             </p>
           </div>
         </div>
+
+        {/* invite button */}
+        <button
+          onClick={() =>
+            onInvite({
+              supplierId: supplier.id,
+              supplierName: supplier.name,
+              email: supplier.email ?? "",
+            })
+          }
+          style={{
+            width: "100%",
+            marginTop: 14,
+            padding: "8px 0",
+            borderRadius: 10,
+            background: "#f5f3ff",
+            color: "#7c3aed",
+            border: "1px solid #ddd6fe",
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: "pointer",
+            fontFamily: "inherit",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+          }}
+        >
+          <Send size={12} /> Invite to Portal
+        </button>
       </div>
     </div>
   );
@@ -435,6 +466,15 @@ function Field({
 export default function SuppliersPage() {
   const queryClient = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
+
+  // Invitation States
+  const [inviteModal, setInviteModal] = useState<{
+    supplierId: string;
+    supplierName: string;
+  } | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteSuccess, setInviteSuccess] = useState(false);
+
   const [form, setForm] = useState({
     name: "",
     contactName: "",
@@ -462,6 +502,18 @@ export default function SuppliersPage() {
         paymentTerms: 30,
         leadTimeDays: 7,
       });
+    },
+  });
+
+  const inviteMutation = useMutation({
+    mutationFn: (data: any) => api.post("/supplier-portal/invite", data),
+    onSuccess: () => {
+      setInviteSuccess(true);
+      setTimeout(() => {
+        setInviteModal(null);
+        setInviteEmail("");
+        setInviteSuccess(false);
+      }, 2000);
     },
   });
 
@@ -619,6 +671,10 @@ export default function SuppliersPage() {
             key={supplier.id}
             supplier={supplier}
             accent={ACCENTS[idx % ACCENTS.length]}
+            onInvite={({ supplierId, supplierName, email }) => {
+              setInviteModal({ supplierId, supplierName });
+              setInviteEmail(email ?? "");
+            }}
           />
         ))}
 
@@ -685,9 +741,195 @@ export default function SuppliersPage() {
         )}
       </div>
 
-      {/* ════════════════════════════════
-          CREATE SUPPLIER MODAL
-      ════════════════════════════════ */}
+      {/* ── invite modal ── */}
+      {inviteModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,.55)",
+            backdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 60,
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 20,
+              width: "100%",
+              maxWidth: 420,
+              padding: "28px",
+              boxShadow: "0 24px 64px rgba(0,0,0,.22)",
+              fontFamily: "'Outfit', sans-serif",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 20,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 9,
+                    background: "#f5f3ff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Send size={16} color="#7c3aed" />
+                </div>
+                <div>
+                  <p
+                    style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}
+                  >
+                    Invite to Supplier Portal
+                  </p>
+                  <p style={{ fontSize: 12, color: "#94a3b8" }}>
+                    {inviteModal.supplierName}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setInviteModal(null);
+                  setInviteEmail("");
+                  setInviteSuccess(false);
+                }}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  background: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  color: "#64748b",
+                }}
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            {inviteSuccess ? (
+              <div style={{ textAlign: "center", padding: "20px 0" }}>
+                <p style={{ fontSize: 15, fontWeight: 700, color: "#16a34a" }}>
+                  ✓ Invite sent successfully!
+                </p>
+                <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 4 }}>
+                  The supplier will receive an email with a link to set up their
+                  account.
+                </p>
+              </div>
+            ) : (
+              <>
+                <p style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>
+                  An email invite will be sent to this address. The supplier can
+                  use it to access their portal and view purchase orders.
+                </p>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#374151",
+                    marginBottom: 6,
+                  }}
+                >
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="supplier@company.com"
+                  style={{
+                    width: "100%",
+                    padding: "11px 14px",
+                    background: "#f8fafc",
+                    border: "1.5px solid #e2e8f0",
+                    borderRadius: 10,
+                    fontSize: 13,
+                    color: "#0f172a",
+                    fontFamily: "inherit",
+                    outline: "none",
+                    boxSizing: "border-box",
+                    marginBottom: 16,
+                  }}
+                />
+                {inviteMutation.isError && (
+                  <p
+                    style={{ fontSize: 12, color: "#e11d48", marginBottom: 12 }}
+                  >
+                    Failed to send invite. Please try again.
+                  </p>
+                )}
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button
+                    onClick={() => {
+                      setInviteModal(null);
+                      setInviteEmail("");
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: 12,
+                      borderRadius: 11,
+                      background: "#f8fafc",
+                      border: "1.5px solid #e2e8f0",
+                      color: "#475569",
+                      fontWeight: 600,
+                      fontSize: 13,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() =>
+                      inviteMutation.mutate({
+                        supplierId: inviteModal.supplierId,
+                        email: inviteEmail,
+                      })
+                    }
+                    disabled={!inviteEmail || inviteMutation.isPending}
+                    style={{
+                      flex: 1,
+                      padding: 12,
+                      borderRadius: 11,
+                      background: "linear-gradient(135deg,#8b5cf6,#7c3aed)",
+                      color: "#fff",
+                      fontWeight: 700,
+                      fontSize: 13,
+                      border: "none",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      opacity:
+                        !inviteEmail || inviteMutation.isPending ? 0.5 : 1,
+                    }}
+                  >
+                    {inviteMutation.isPending ? "Sending…" : "Send Invite"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── create supplier modal ── */}
       {showCreate && (
         <div
           style={{
@@ -715,15 +957,12 @@ export default function SuppliersPage() {
               overflowY: "auto",
             }}
           >
-            {/* top colour bar */}
             <div
               style={{
                 height: 5,
                 background: "linear-gradient(135deg,#8b5cf6,#7c3aed)",
               }}
             />
-
-            {/* header */}
             <div
               style={{
                 display: "flex",
@@ -777,7 +1016,6 @@ export default function SuppliersPage() {
               </button>
             </div>
 
-            {/* body */}
             <div
               style={{
                 padding: "20px 22px",
@@ -858,7 +1096,6 @@ export default function SuppliersPage() {
               </div>
             </div>
 
-            {/* footer */}
             <div style={{ padding: "0 22px 22px", display: "flex", gap: 10 }}>
               <button
                 onClick={() => setShowCreate(false)}
@@ -874,12 +1111,6 @@ export default function SuppliersPage() {
                   cursor: "pointer",
                   fontFamily: "inherit",
                 }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "#f1f5f9")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = "#f8fafc")
-                }
               >
                 Cancel
               </button>

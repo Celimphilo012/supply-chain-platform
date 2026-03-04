@@ -15,6 +15,7 @@ import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { ForecastingModule } from './modules/forecasting/forecasting.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { SupplierPortalModule } from './modules/supplier-portal/supplier-portal.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { AdminModule } from './modules/admin/admin.module';
     RealtimeModule,
     ForecastingModule,
     AdminModule,
+    SupplierPortalModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
