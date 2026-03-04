@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 import {
@@ -12,6 +12,12 @@ import {
   CheckCircle,
   TrendingUp,
   Truck,
+  Bell,
+  BookOpen,
+  ThumbsUp,
+  ThumbsDown,
+  X,
+  AlertCircle,
 } from "lucide-react";
 
 const ACCENT = "#e11d48";
@@ -27,14 +33,19 @@ const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
   draft: { bg: "#f8fafc", color: "#64748b" },
   pending_approval: { bg: "#fffbeb", color: "#d97706" },
   approved: { bg: "#eff6ff", color: "#2563eb" },
-  sent: { bg: "#f5f3ff", color: "#7c3aed" },
+  sent: { bg: "#fdf4ff", color: "#a21caf" },
+  confirmed: { bg: "#f0fdf4", color: "#16a34a" },
+  rejected: { bg: "#fff1f2", color: "#e11d48" },
   partial: { bg: "#fff7ed", color: "#ea580c" },
-  received: { bg: "#f0fdf4", color: "#16a34a" },
-  cancelled: { bg: "#fff1f2", color: "#e11d48" },
+  received: { bg: "#f0fdf4", color: "#15803d" },
+  cancelled: { bg: "#f8fafc", color: "#94a3b8" },
 };
 
 function getApi() {
-  const token = localStorage.getItem("supplier_token");
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("supplier_token")
+      : null;
   return axios.create({
     baseURL: process.env.NEXT_PUBLIC_API_URL + "/api/v1",
     headers: { Authorization: `Bearer ${token}` },
@@ -43,8 +54,14 @@ function getApi() {
 
 export default function SupplierDashboardPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<any>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [ackModal, setAckModal] = useState<{
+    po: any;
+    action: "confirm" | "reject";
+  } | null>(null);
+  const [ackNotes, setAckNotes] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("supplier_token");
@@ -66,6 +83,29 @@ export default function SupplierDashboardPage() {
     enabled: hydrated,
   });
 
+  const { data: notifications = [] } = useQuery({
+    queryKey: ["supplier-notifications"],
+    queryFn: () =>
+      getApi()
+        .get("/supplier-portal/notifications")
+        .then((r) => r.data),
+    enabled: hydrated,
+  });
+
+  const ackMutation = useMutation({
+    mutationFn: ({ poId, action, notes }: any) =>
+      getApi().post(`/supplier-portal/orders/${poId}/acknowledge`, {
+        action,
+        notes,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["supplier-portal"] });
+      queryClient.invalidateQueries({ queryKey: ["supplier-notifications"] });
+      setAckModal(null);
+      setAckNotes("");
+    },
+  });
+
   const logout = () => {
     localStorage.removeItem("supplier_token");
     localStorage.removeItem("supplier_user");
@@ -79,15 +119,22 @@ export default function SupplierDashboardPage() {
       (acc: number, p: any) => acc + (p.recentOrders?.length ?? 0),
       0,
     ) ?? 0;
-  const pendingOrders =
+  const pendingAck =
     portal?.reduce(
       (acc: number, p: any) =>
         acc +
-        (p.recentOrders?.filter((o: any) =>
-          ["approved", "sent", "pending_approval"].includes(o.status),
-        ).length ?? 0),
+        (p.recentOrders?.filter((o: any) => o.status === "sent").length ?? 0),
       0,
     ) ?? 0;
+  const confirmed =
+    portal?.reduce(
+      (acc: number, p: any) =>
+        acc +
+        (p.recentOrders?.filter((o: any) => o.status === "confirmed").length ??
+          0),
+      0,
+    ) ?? 0;
+  const unreadNotifs = notifications.filter((n: any) => !n.isRead).length;
 
   if (!hydrated)
     return (
@@ -105,7 +152,7 @@ export default function SupplierDashboardPage() {
             width: 40,
             height: 40,
             border: "3px solid rgba(255,255,255,.2)",
-            borderTopColor: "#e11d48",
+            borderTopColor: ACCENT,
             borderRadius: "50%",
             animation: "spin 0.8s linear infinite",
           }}
@@ -151,40 +198,100 @@ export default function SupplierDashboardPage() {
             Supplier Portal
           </span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div
+
+        {/* nav */}
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          {[
+            {
+              label: "Dashboard",
+              href: "/supplier-portal/dashboard",
+              icon: TrendingUp,
+            },
+            {
+              label: "Catalogue",
+              href: "/supplier-portal/catalogue",
+              icon: BookOpen,
+            },
+          ].map((nav) => (
+            <button
+              key={nav.href}
+              onClick={() => router.push(nav.href)}
               style={{
-                width: 32,
-                height: 32,
-                borderRadius: 8,
-                background: `linear-gradient(135deg,${ACCENT},#be123c)`,
-                display: "flex",
+                display: "inline-flex",
                 alignItems: "center",
-                justifyContent: "center",
-                color: "#fff",
-                fontWeight: 700,
+                gap: 5,
+                padding: "6px 12px",
+                borderRadius: 8,
+                background: "rgba(255,255,255,.06)",
+                border: "1px solid rgba(255,255,255,.1)",
+                color: "rgba(255,255,255,.7)",
                 fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "inherit",
               }}
             >
-              {initials || "?"}
-            </div>
-            <div style={{ display: "none" }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>
-                {user?.firstName} {user?.lastName}
-              </p>
-              <p style={{ fontSize: 11, color: "rgba(255,255,255,.5)" }}>
-                {user?.email}
-              </p>
-            </div>
-            <div>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>
-                {user?.firstName} {user?.lastName}
-              </p>
-              <p style={{ fontSize: 11, color: "rgba(255,255,255,.5)" }}>
-                {user?.email}
-              </p>
-            </div>
+              <nav.icon size={13} /> {nav.label}
+            </button>
+          ))}
+          <button
+            onClick={() => router.push("/supplier-portal/notifications")}
+            style={{
+              position: "relative",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "6px 12px",
+              borderRadius: 8,
+              background: "rgba(255,255,255,.06)",
+              border: "1px solid rgba(255,255,255,.1)",
+              color: "rgba(255,255,255,.7)",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            <Bell size={13} /> Notifications
+            {unreadNotifs > 0 && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: -4,
+                  right: -4,
+                  width: 16,
+                  height: 16,
+                  borderRadius: "50%",
+                  background: ACCENT,
+                  color: "#fff",
+                  fontSize: 9,
+                  fontWeight: 800,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {unreadNotifs}
+              </span>
+            )}
+          </button>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div>
+            <p
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#fff",
+                lineHeight: 1.2,
+              }}
+            >
+              {user?.firstName} {user?.lastName}
+            </p>
+            <p style={{ fontSize: 11, color: "rgba(255,255,255,.5)" }}>
+              {user?.email}
+            </p>
           </div>
           <button
             onClick={logout}
@@ -203,7 +310,7 @@ export default function SupplierDashboardPage() {
               fontFamily: "inherit",
             }}
           >
-            <LogOut size={13} /> Sign Out
+            <LogOut size={13} />
           </button>
         </div>
       </div>
@@ -218,15 +325,41 @@ export default function SupplierDashboardPage() {
           gap: 20,
         }}
       >
-        {/* welcome */}
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>
-            Welcome back, {user?.firstName}
+            Welcome, {user?.firstName}
           </h1>
           <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 4 }}>
             Here's an overview of your supply relationships and orders
           </p>
         </div>
+
+        {/* pending acknowledgement banner */}
+        {pendingAck > 0 && (
+          <div
+            style={{
+              background: "#fffbeb",
+              border: "1px solid #fde68a",
+              borderRadius: 14,
+              padding: "14px 20px",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
+            <AlertCircle size={18} color="#d97706" />
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 700, color: "#92400e" }}>
+                Action required: {pendingAck} purchase order
+                {pendingAck !== 1 ? "s" : ""} awaiting your confirmation
+              </p>
+              <p style={{ fontSize: 12, color: "#b45309" }}>
+                Please confirm or reject orders below to notify the
+                organization.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* stats */}
         <div
@@ -252,17 +385,17 @@ export default function SupplierDashboardPage() {
               bg: "#f5f3ff",
             },
             {
-              label: "Pending Orders",
-              value: pendingOrders,
+              label: "Awaiting Confirmation",
+              value: pendingAck,
               icon: Clock,
-              color: "#f59e0b",
+              color: "#d97706",
               bg: "#fffbeb",
             },
             {
-              label: "Completed",
-              value: totalOrders - pendingOrders,
+              label: "Confirmed",
+              value: confirmed,
               icon: CheckCircle,
-              color: "#10b981",
+              color: "#16a34a",
               bg: "#f0fdf4",
             },
           ].map((s) => (
@@ -309,7 +442,7 @@ export default function SupplierDashboardPage() {
           ))}
         </div>
 
-        {/* org cards */}
+        {/* org + orders */}
         {isLoading ? (
           <div style={{ ...CARD, padding: 40, textAlign: "center" }}>
             <p style={{ color: "#94a3b8" }}>Loading your portal…</p>
@@ -324,79 +457,44 @@ export default function SupplierDashboardPage() {
             <p style={{ fontSize: 14, fontWeight: 600, color: "#475569" }}>
               No organizations yet
             </p>
-            <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 4 }}>
-              You'll appear here once an organization accepts your invite
-            </p>
           </div>
         ) : (
           portal.map((p: any) => (
             <div key={p.supplier.id} style={CARD}>
-              {/* org header */}
               <div
                 style={{
                   padding: "18px 24px",
                   borderBottom: "1px solid #f1f5f9",
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                  gap: 10,
+                  gap: 12,
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div
-                    style={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: 11,
-                      background: "#f5f3ff",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Building2 size={20} color="#7c3aed" />
-                  </div>
-                  <div>
-                    <p
-                      style={{
-                        fontSize: 15,
-                        fontWeight: 700,
-                        color: "#0f172a",
-                      }}
-                    >
-                      {p.organization.name}
-                    </p>
-                    <p style={{ fontSize: 12, color: "#94a3b8" }}>
-                      Supplier: {p.supplier.name}
-                    </p>
-                  </div>
+                <div
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 11,
+                    background: "#f5f3ff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Building2 size={20} color="#7c3aed" />
                 </div>
-                <div style={{ display: "flex", gap: 10 }}>
-                  <div
-                    style={{
-                      textAlign: "center",
-                      padding: "6px 14px",
-                      background: "#f8fafc",
-                      borderRadius: 10,
-                      border: "1px solid #e2e8f0",
-                    }}
+                <div>
+                  <p
+                    style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}
                   >
-                    <p
-                      style={{
-                        fontSize: 16,
-                        fontWeight: 800,
-                        color: "#0f172a",
-                      }}
-                    >
-                      {p.recentOrders?.length ?? 0}
-                    </p>
-                    <p style={{ fontSize: 11, color: "#94a3b8" }}>Orders</p>
-                  </div>
+                    {p.organization.name}
+                  </p>
+                  <p style={{ fontSize: 12, color: "#94a3b8" }}>
+                    Supplier: {p.supplier.name}
+                  </p>
                 </div>
               </div>
 
-              {/* orders table */}
               {p.recentOrders?.length > 0 ? (
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -408,7 +506,7 @@ export default function SupplierDashboardPage() {
                           "Items",
                           "Total",
                           "Expected Delivery",
-                          "Notes",
+                          "Action",
                         ].map((h) => (
                           <th
                             key={h}
@@ -434,10 +532,14 @@ export default function SupplierDashboardPage() {
                       {p.recentOrders.map((order: any) => {
                         const ss =
                           STATUS_STYLE[order.status] ?? STATUS_STYLE.draft;
+                        const canAck = order.status === "sent";
                         return (
                           <tr
                             key={order.id}
-                            style={{ borderBottom: "1px solid #f8fafc" }}
+                            style={{
+                              borderBottom: "1px solid #f8fafc",
+                              background: canAck ? "#fffdf0" : "transparent",
+                            }}
                           >
                             <td style={{ padding: "13px 20px" }}>
                               <span
@@ -506,18 +608,67 @@ export default function SupplierDashboardPage() {
                                   ).toLocaleDateString("en-ZA")
                                 : "—"}
                             </td>
-                            <td
-                              style={{
-                                padding: "13px 20px",
-                                fontSize: 12,
-                                color: "#94a3b8",
-                                maxWidth: 200,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {order.notes || "—"}
+                            <td style={{ padding: "13px 20px" }}>
+                              {canAck ? (
+                                <div style={{ display: "flex", gap: 6 }}>
+                                  <button
+                                    onClick={() => {
+                                      setAckModal({
+                                        po: order,
+                                        action: "confirm",
+                                      });
+                                      setAckNotes("");
+                                    }}
+                                    style={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 5,
+                                      padding: "6px 12px",
+                                      borderRadius: 8,
+                                      background: "#f0fdf4",
+                                      border: "1px solid #bbf7d0",
+                                      color: "#16a34a",
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      cursor: "pointer",
+                                      fontFamily: "inherit",
+                                    }}
+                                  >
+                                    <ThumbsUp size={12} /> Confirm
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setAckModal({
+                                        po: order,
+                                        action: "reject",
+                                      });
+                                      setAckNotes("");
+                                    }}
+                                    style={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 5,
+                                      padding: "6px 12px",
+                                      borderRadius: 8,
+                                      background: "#fff1f2",
+                                      border: "1px solid #fecdd3",
+                                      color: ACCENT,
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      cursor: "pointer",
+                                      fontFamily: "inherit",
+                                    }}
+                                  >
+                                    <ThumbsDown size={12} /> Reject
+                                  </button>
+                                </div>
+                              ) : (
+                                <span
+                                  style={{ fontSize: 12, color: "#94a3b8" }}
+                                >
+                                  —
+                                </span>
+                              )}
                             </td>
                           </tr>
                         );
@@ -541,6 +692,204 @@ export default function SupplierDashboardPage() {
           ))
         )}
       </div>
+
+      {/* acknowledge modal */}
+      {ackModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,.55)",
+            backdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 60,
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 20,
+              width: "100%",
+              maxWidth: 420,
+              padding: "28px",
+              boxShadow: "0 24px 64px rgba(0,0,0,.22)",
+              fontFamily: "'Outfit', sans-serif",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 20,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 9,
+                    background:
+                      ackModal.action === "confirm" ? "#f0fdf4" : "#fff1f2",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {ackModal.action === "confirm" ? (
+                    <ThumbsUp size={16} color="#16a34a" />
+                  ) : (
+                    <ThumbsDown size={16} color={ACCENT} />
+                  )}
+                </div>
+                <div>
+                  <p
+                    style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}
+                  >
+                    {ackModal.action === "confirm" ? "Confirm" : "Reject"}{" "}
+                    Purchase Order
+                  </p>
+                  <p style={{ fontSize: 12, color: "#94a3b8" }}>
+                    {ackModal.po.poNumber}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setAckModal(null)}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  background: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  color: "#64748b",
+                }}
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>
+              {ackModal.action === "confirm"
+                ? "Confirming this order will notify the organization and update the PO status to confirmed."
+                : "Rejecting this order will notify the organization. Please provide a reason below."}
+            </p>
+
+            <label
+              style={{
+                display: "block",
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#374151",
+                marginBottom: 6,
+              }}
+            >
+              {ackModal.action === "confirm"
+                ? "Notes (optional)"
+                : "Reason for rejection"}
+            </label>
+            <textarea
+              value={ackNotes}
+              onChange={(e) => setAckNotes(e.target.value)}
+              placeholder={
+                ackModal.action === "confirm"
+                  ? "Any notes for the organization…"
+                  : "Please explain why you are rejecting this order…"
+              }
+              rows={3}
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                background: "#f8fafc",
+                border: "1.5px solid #e2e8f0",
+                borderRadius: 10,
+                fontSize: 13,
+                color: "#0f172a",
+                fontFamily: "inherit",
+                outline: "none",
+                resize: "vertical",
+                boxSizing: "border-box",
+                marginBottom: 16,
+              }}
+            />
+
+            {ackMutation.isError && (
+              <p
+                style={{
+                  fontSize: 12,
+                  color: ACCENT,
+                  marginBottom: 12,
+                  padding: "8px 12px",
+                  background: "#fff1f2",
+                  borderRadius: 8,
+                }}
+              >
+                Failed to submit. Please try again.
+              </p>
+            )}
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => setAckModal(null)}
+                style={{
+                  flex: 1,
+                  padding: 12,
+                  borderRadius: 11,
+                  background: "#f8fafc",
+                  border: "1.5px solid #e2e8f0",
+                  color: "#475569",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() =>
+                  ackMutation.mutate({
+                    poId: ackModal.po.id,
+                    action: ackModal.action,
+                    notes: ackNotes || undefined,
+                  })
+                }
+                disabled={ackMutation.isPending}
+                style={{
+                  flex: 1,
+                  padding: 12,
+                  borderRadius: 11,
+                  background:
+                    ackModal.action === "confirm"
+                      ? "linear-gradient(135deg,#16a34a,#15803d)"
+                      : `linear-gradient(135deg,${ACCENT},#be123c)`,
+                  color: "#fff",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  border: "none",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  opacity: ackMutation.isPending ? 0.6 : 1,
+                }}
+              >
+                {ackMutation.isPending
+                  ? "Submitting…"
+                  : ackModal.action === "confirm"
+                    ? "Confirm Order"
+                    : "Reject Order"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

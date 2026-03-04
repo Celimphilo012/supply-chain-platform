@@ -15,6 +15,8 @@ import { validateTransition } from '../po-state-machine';
 import { InventoryService } from '../../inventory/services/inventory.service';
 import { TransactionType } from '../../inventory/entities/inventory-transaction.entity';
 import { RealtimeService } from '../../realtime/realtime.service';
+import { SupplierPortalService } from '../../supplier-portal/supplier-portal.service';
+import { forwardRef, Inject } from '@nestjs/common';
 
 @Injectable()
 export class PurchaseOrdersService {
@@ -26,6 +28,8 @@ export class PurchaseOrdersService {
     private inventoryService: InventoryService,
     private dataSource: DataSource,
     private realtimeService: RealtimeService,
+    @Inject(forwardRef(() => SupplierPortalService))
+    private supplierPortalService: SupplierPortalService,
   ) {}
 
   async create(
@@ -113,6 +117,13 @@ export class PurchaseOrdersService {
     if (dto.status === POStatus.APPROVED) {
       po.approvedById = userId;
       po.approvedAt = new Date();
+    }
+    // notify supplier when PO is sent
+    if (dto.status === POStatus.SENT) {
+      const updatedPO = await this.findOne(organizationId, id);
+      this.supplierPortalService
+        .notifySupplierOfNewPO(updatedPO)
+        .catch(() => {});
     }
     // Emit real-time PO status change
     try {

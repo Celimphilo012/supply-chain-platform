@@ -11,6 +11,8 @@ export enum POStatus {
   PENDING_APPROVAL = 'pending_approval',
   APPROVED = 'approved',
   SENT = 'sent',
+  CONFIRMED = 'confirmed', // ← add
+  REJECTED = 'rejected',
   PARTIAL = 'partial',
   RECEIVED = 'received',
   CANCELLED = 'cancelled',

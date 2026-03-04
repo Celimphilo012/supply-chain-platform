@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { forwardRef } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { Supplier } from './entities/supplier.entity';
 import { SupplierProduct } from './entities/supplier-product.entity';
@@ -11,6 +12,7 @@ import { SuppliersController } from './controllers/suppliers.controller';
 import { PurchaseOrdersController } from './controllers/purchase-orders.controller';
 import { InventoryModule } from '../inventory/inventory.module';
 import { RealtimeModule } from '../realtime/realtime.module';
+import { SupplierPortalModule } from '../supplier-portal/supplier-portal.module';
 
 @Module({
   imports: [
@@ -23,6 +25,7 @@ import { RealtimeModule } from '../realtime/realtime.module';
     JwtModule.register({}),
     InventoryModule,
     RealtimeModule,
+    forwardRef(() => SupplierPortalModule),
   ],
   controllers: [SuppliersController, PurchaseOrdersController],
   providers: [SuppliersService, PurchaseOrdersService],
