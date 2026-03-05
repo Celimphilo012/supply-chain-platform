@@ -12,8 +12,8 @@ import {
   Warehouse,
   LogOut,
   Menu,
-  X,
   Bell,
+  X,
   Settings,
 } from "lucide-react";
 

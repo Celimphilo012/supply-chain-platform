@@ -2,7 +2,16 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { Plus, X, ShoppingCart, ArrowRight, CheckCircle } from "lucide-react";
+import {
+  Plus,
+  X,
+  ShoppingCart,
+  ArrowRight,
+  CheckCircle,
+  Package,
+  Star,
+  Trash2,
+} from "lucide-react";
 
 const STATUS_CONFIG: Record<
   string,
@@ -22,6 +31,18 @@ const STATUS_CONFIG: Record<
     label: "Approved",
   },
   sent: { bg: "#f5f3ff", color: "#6d28d9", dot: "#8b5cf6", label: "Sent" },
+  confirmed: {
+    bg: "#f0fdf4",
+    color: "#15803d",
+    dot: "#22c55e",
+    label: "Confirmed",
+  },
+  rejected: {
+    bg: "#fff1f2",
+    color: "#dc2626",
+    dot: "#ef4444",
+    label: "Rejected",
+  },
   partial: {
     bg: "#fff7ed",
     color: "#c2410c",
@@ -70,9 +91,14 @@ const NEXT_STATUS: Record<
     bg: "#f0fdf4",
     color: "#15803d",
   },
+  confirmed: {
+    status: "received",
+    label: "Received",
+    bg: "#f0fdf4",
+    color: "#15803d",
+  },
 };
 
-// ── shared tokens ─────────────────────────────────────────────────────────
 const PAGE_PAD = "clamp(16px,3vw,28px)";
 const CARD: React.CSSProperties = {
   background: "#fff",
@@ -103,10 +129,8 @@ const INPUT: React.CSSProperties = {
   color: "#0f172a",
   fontFamily: "inherit",
   outline: "none",
-  transition: "border-color .15s",
   boxSizing: "border-box" as const,
 };
-const SELECT: React.CSSProperties = { ...INPUT };
 const LABEL: React.CSSProperties = {
   display: "block",
   fontSize: 13,
@@ -114,26 +138,6 @@ const LABEL: React.CSSProperties = {
   color: "#374151",
   marginBottom: 6,
 };
-
-function Field({
-  label,
-  required,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label style={LABEL}>
-        {label}
-        {required && <span style={{ color: "#ef4444", marginLeft: 3 }}>*</span>}
-      </label>
-      {children}
-    </div>
-  );
-}
 
 function Skeletons({ cols }: { cols: number }) {
   return (
@@ -162,14 +166,24 @@ function Skeletons({ cols }: { cols: number }) {
 export default function PurchaseOrdersPage() {
   const queryClient = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState("");
   const [form, setForm] = useState({
     supplierId: "",
     warehouseId: "",
     notes: "",
     expectedDeliveryDate: "",
     currency: "ZAR",
-    items: [{ productId: "", quantityOrdered: 1, unitCost: 0 }],
   });
+  const [selectedItems, setSelectedItems] = useState<
+    {
+      id: string;
+      name: string;
+      sku?: string;
+      unitCost: number;
+      quantity: number;
+      isPreferred: boolean;
+    }[]
+  >([]);
 
   const { data: orders, isLoading } = useQuery({
     queryKey: ["purchase-orders"],
@@ -181,20 +195,31 @@ export default function PurchaseOrdersPage() {
   });
   const { data: warehouses } = useQuery({
     queryKey: ["warehouses"],
-    queryFn: () => api.get("/warehouses").then((r) => r.data),
+    queryFn: () =>
+      api
+        .get("/warehouses")
+        .then((r) => (Array.isArray(r.data) ? r.data : (r.data.data ?? []))),
   });
-  const { data: products } = useQuery({
-    queryKey: ["products"],
-    queryFn: () => api.get("/products").then((r) => r.data),
-  });
+
+  // fetch supplier catalogue when supplier is selected
+  const { data: supplierCatalogue = [], isLoading: catalogueLoading } =
+    useQuery<any[]>({
+      queryKey: ["supplier-catalogue-org", selectedSupplier],
+      queryFn: () =>
+        api
+          .get(`/supplier-portal/supplier-catalogue/${selectedSupplier}`)
+          .then((r) => r.data),
+      enabled: !!selectedSupplier,
+    });
 
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post("/purchase-orders", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
-      setShowCreate(false);
+      resetForm();
     },
   });
+
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: any) =>
       api.patch(`/purchase-orders/${id}/status`, { status }),
@@ -202,18 +227,78 @@ export default function PurchaseOrdersPage() {
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] }),
   });
 
-  const addItem = () =>
-    setForm((f) => ({
-      ...f,
-      items: [...f.items, { productId: "", quantityOrdered: 1, unitCost: 0 }],
-    }));
-  const updateItem = (i: number, field: string, value: any) =>
-    setForm((f) => ({
-      ...f,
-      items: f.items.map((item, idx) =>
-        idx === i ? { ...item, [field]: value } : item,
-      ),
-    }));
+  const resetForm = () => {
+    setShowCreate(false);
+    setSelectedSupplier("");
+    setForm({
+      supplierId: "",
+      warehouseId: "",
+      notes: "",
+      expectedDeliveryDate: "",
+      currency: "ZAR",
+    });
+    setSelectedItems([]);
+  };
+
+  const handleSupplierChange = (supplierId: string) => {
+    setSelectedSupplier(supplierId);
+    setForm((f) => ({ ...f, supplierId }));
+    setSelectedItems([]); // reset items when supplier changes
+  };
+
+  const toggleItem = (item: any) => {
+    setSelectedItems((prev) => {
+      const exists = prev.find((i) => i.id === item.id);
+      if (exists) return prev.filter((i) => i.id !== item.id);
+      return [
+        ...prev,
+        {
+          id: item.id,
+          name: item.name,
+          sku: item.sku,
+          unitCost: parseFloat(item.unitCost),
+          quantity: item.minimumOrderQuantity || 1,
+          isPreferred: item.isPreferred,
+        },
+      ];
+    });
+  };
+
+  const updateQty = (id: string, quantity: number) => {
+    if (quantity < 1) return;
+    setSelectedItems((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, quantity } : i)),
+    );
+  };
+
+  const updatePrice = (id: string, unitCost: number) => {
+    setSelectedItems((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, unitCost } : i)),
+    );
+  };
+
+  const orderTotal = selectedItems.reduce(
+    (s, i) => s + i.unitCost * i.quantity,
+    0,
+  );
+
+  const submitPO = () => {
+    if (!form.supplierId || !form.warehouseId || selectedItems.length === 0)
+      return;
+    createMutation.mutate({
+      supplierId: form.supplierId,
+      warehouseId: form.warehouseId,
+      notes: form.notes || undefined,
+      expectedDeliveryDate: form.expectedDeliveryDate || undefined,
+      currency: form.currency,
+      items: selectedItems.map((i) => ({
+        // we use item name as a reference — map to productId if available
+        productName: i.name, // catalogue item id used as reference
+        quantityOrdered: i.quantity,
+        unitCost: i.unitCost,
+      })),
+    });
+  };
 
   const totalValue =
     orders?.reduce((s: number, o: any) => s + Number(o.totalAmount), 0) ?? 0;
@@ -242,10 +327,12 @@ export default function PurchaseOrdersPage() {
         @media(max-width:500px){.po-stats{grid-template-columns:1fr 1fr}}
         tr:hover td{background:#fffdf5 !important}
         .po-input:focus{border-color:#f59e0b !important;background:#fff !important}
-        .item-input:focus{border-color:#f59e0b !important}
+        .cat-item{cursor:pointer;border-radius:12px;border:1.5px solid #e2e8f0;padding:12px 14px;transition:all .15s;background:#fff}
+        .cat-item:hover{border-color:#f59e0b;background:#fffdf5}
+        .cat-item.selected{border-color:#f59e0b;background:#fffbeb}
       `}</style>
 
-      {/* ── header ── */}
+      {/* header */}
       <div
         style={{
           display: "flex",
@@ -256,14 +343,7 @@ export default function PurchaseOrdersPage() {
         }}
       >
         <div>
-          <h1
-            style={{
-              fontSize: 22,
-              fontWeight: 800,
-              color: "#0f172a",
-              lineHeight: 1.2,
-            }}
-          >
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>
             Purchase Orders
           </h1>
           <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 4 }}>
@@ -286,38 +366,31 @@ export default function PurchaseOrdersPage() {
             cursor: "pointer",
             boxShadow: "0 4px 14px rgba(245,158,11,.35)",
             fontFamily: "inherit",
-            whiteSpace: "nowrap",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.opacity = ".88")}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
         >
-          <Plus size={15} />
-          New Purchase Order
+          <Plus size={15} /> New Purchase Order
         </button>
       </div>
 
-      {/* ── stat strip ── */}
+      {/* stats */}
       <div className="po-stats">
         {[
           {
             label: "Total Value",
             value: `R${totalValue >= 1000 ? (totalValue / 1000).toFixed(1) + "K" : totalValue.toLocaleString()}`,
             color: "#d97706",
-            bg: "#fffbeb",
             grad: "linear-gradient(135deg,#f59e0b,#d97706)",
           },
           {
             label: "Active Orders",
             value: pendingCount,
             color: "#7c3aed",
-            bg: "#f5f3ff",
             grad: null,
           },
           {
             label: "Completed",
             value: receivedCount,
             color: "#16a34a",
-            bg: "#f0fdf4",
             grad: null,
           },
         ].map((s) => (
@@ -348,11 +421,10 @@ export default function PurchaseOrdersPage() {
                 width: 38,
                 height: 38,
                 borderRadius: 10,
-                background: s.grad ? "rgba(255,255,255,.2)" : s.bg,
+                background: s.grad ? "rgba(255,255,255,.2)" : "#fffbeb",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                flexShrink: 0,
               }}
             >
               <ShoppingCart size={17} color={s.grad ? "#fff" : s.color} />
@@ -376,7 +448,7 @@ export default function PurchaseOrdersPage() {
         ))}
       </div>
 
-      {/* ── table card ── */}
+      {/* table */}
       <div style={CARD}>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -392,7 +464,6 @@ export default function PurchaseOrdersPage() {
             </thead>
             <tbody>
               {isLoading && <Skeletons cols={6} />}
-
               {orders?.map((order: any) => {
                 const s = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.draft;
                 const next = NEXT_STATUS[order.status];
@@ -404,7 +475,6 @@ export default function PurchaseOrdersPage() {
                       transition: "background .1s",
                     }}
                   >
-                    {/* PO number */}
                     <td style={{ padding: "13px 20px" }}>
                       <p
                         style={{
@@ -431,8 +501,6 @@ export default function PurchaseOrdersPage() {
                         </p>
                       )}
                     </td>
-
-                    {/* supplier */}
                     <td
                       style={{
                         padding: "13px 20px",
@@ -443,8 +511,6 @@ export default function PurchaseOrdersPage() {
                     >
                       {order.supplier?.name}
                     </td>
-
-                    {/* warehouse */}
                     <td style={{ padding: "13px 20px" }}>
                       <span
                         style={{
@@ -459,8 +525,6 @@ export default function PurchaseOrdersPage() {
                         {order.warehouse?.name}
                       </span>
                     </td>
-
-                    {/* amount */}
                     <td
                       style={{
                         padding: "13px 20px",
@@ -473,8 +537,6 @@ export default function PurchaseOrdersPage() {
                       {order.currency}{" "}
                       {Number(order.totalAmount).toLocaleString()}
                     </td>
-
-                    {/* status badge */}
                     <td style={{ padding: "13px 20px" }}>
                       <span
                         style={{
@@ -500,8 +562,6 @@ export default function PurchaseOrdersPage() {
                         {s.label}
                       </span>
                     </td>
-
-                    {/* action */}
                     <td style={{ padding: "13px 20px" }}>
                       {next ? (
                         <button
@@ -526,15 +586,7 @@ export default function PurchaseOrdersPage() {
                             cursor: "pointer",
                             fontFamily: "inherit",
                             opacity: statusMutation.isPending ? 0.5 : 1,
-                            transition: "opacity .15s",
                           }}
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.opacity = ".75")
-                          }
-                          onMouseLeave={(e) =>
-                            (e.currentTarget.style.opacity =
-                              statusMutation.isPending ? ".5" : "1")
-                          }
                         >
                           {next.label} <ArrowRight size={11} />
                         </button>
@@ -556,8 +608,6 @@ export default function PurchaseOrdersPage() {
                   </tr>
                 );
               })}
-
-              {/* empty */}
               {!isLoading && (!orders || orders.length === 0) && (
                 <tr>
                   <td
@@ -583,7 +633,7 @@ export default function PurchaseOrdersPage() {
                         fontSize: 14,
                         fontWeight: 600,
                         color: "#475569",
-                        marginBottom: 6,
+                        marginBottom: 12,
                       }}
                     >
                       No purchase orders yet
@@ -615,9 +665,7 @@ export default function PurchaseOrdersPage() {
         </div>
       </div>
 
-      {/* ════════════════════════════════
-          CREATE PO MODAL
-      ════════════════════════════════ */}
+      {/* create modal */}
       {showCreate && (
         <div
           style={{
@@ -626,10 +674,10 @@ export default function PurchaseOrdersPage() {
             background: "rgba(15,23,42,.55)",
             backdropFilter: "blur(6px)",
             display: "flex",
-            alignItems: "center",
+            alignItems: "flex-start",
             justifyContent: "center",
             zIndex: 60,
-            padding: 16,
+            padding: "24px 16px",
             overflowY: "auto",
           }}
         >
@@ -638,30 +686,20 @@ export default function PurchaseOrdersPage() {
               background: "#fff",
               borderRadius: 20,
               width: "100%",
-              maxWidth: 580,
+              maxWidth: 760,
               boxShadow: "0 24px 64px rgba(0,0,0,.22)",
-              overflow: "hidden",
               fontFamily: "'Outfit', sans-serif",
-              margin: "auto",
-              maxHeight: "90vh",
-              overflowY: "auto",
+              marginBottom: 24,
             }}
           >
+            {/* modal header */}
             <div
               style={{
-                height: 5,
-                background: "linear-gradient(135deg,#f59e0b,#d97706)",
-              }}
-            />
-
-            {/* header */}
-            <div
-              style={{
+                padding: "22px 28px",
+                borderBottom: "1px solid #f1f5f9",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                padding: "18px 22px",
-                borderBottom: "1px solid #f1f5f9",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -670,27 +708,20 @@ export default function PurchaseOrdersPage() {
                     width: 36,
                     height: 36,
                     borderRadius: 9,
-                    background: "linear-gradient(135deg,#f59e0b,#d97706)",
+                    background: "#fffbeb",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                   }}
                 >
-                  <ShoppingCart size={16} color="#fff" />
+                  <ShoppingCart size={17} color="#d97706" />
                 </div>
-                <div>
-                  <p
-                    style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}
-                  >
-                    Create Purchase Order
-                  </p>
-                  <p style={{ fontSize: 12, color: "#94a3b8" }}>
-                    Fill in procurement details
-                  </p>
-                </div>
+                <p style={{ fontWeight: 800, fontSize: 16, color: "#0f172a" }}>
+                  New Purchase Order
+                </p>
               </div>
               <button
-                onClick={() => setShowCreate(false)}
+                onClick={resetForm}
                 style={{
                   width: 32,
                   height: 32,
@@ -708,296 +739,664 @@ export default function PurchaseOrdersPage() {
               </button>
             </div>
 
-            {/* body */}
             <div
               style={{
-                padding: "20px 22px",
+                padding: "24px 28px",
                 display: "flex",
                 flexDirection: "column",
-                gap: 14,
+                gap: 20,
               }}
             >
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 12,
-                }}
-              >
-                <Field label="Supplier" required>
-                  <select
-                    value={form.supplierId}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, supplierId: e.target.value }))
-                    }
-                    style={SELECT}
-                    className="po-input"
-                  >
-                    <option value="">Select supplier…</option>
-                    {suppliers?.map((s: any) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Warehouse" required>
-                  <select
-                    value={form.warehouseId}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, warehouseId: e.target.value }))
-                    }
-                    style={SELECT}
-                    className="po-input"
-                  >
-                    <option value="">Select warehouse…</option>
-                    {warehouses?.map((w: any) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Expected Delivery">
-                  <input
-                    type="date"
-                    value={form.expectedDeliveryDate}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        expectedDeliveryDate: e.target.value,
-                      }))
-                    }
-                    style={INPUT}
-                    className="po-input"
-                  />
-                </Field>
-                <Field label="Currency">
-                  <select
-                    value={form.currency}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, currency: e.target.value }))
-                    }
-                    style={SELECT}
-                    className="po-input"
-                  >
-                    <option value="ZAR">ZAR — South African Rand</option>
-                    <option value="USD">USD — US Dollar</option>
-                    <option value="EUR">EUR — Euro</option>
-                  </select>
-                </Field>
-              </div>
-
-              {/* line items */}
-              <div
-                style={{
-                  background: "#f8fafc",
-                  border: "1.5px solid #e2e8f0",
-                  borderRadius: 12,
-                  padding: 14,
-                }}
-              >
-                <div
+              {/* step 1 - order details */}
+              <div>
+                <p
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: 10,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "#94a3b8",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    marginBottom: 14,
                   }}
                 >
-                  <p
-                    style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}
-                  >
-                    Line Items
-                  </p>
-                  <button
-                    onClick={addItem}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 4,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: "#d97706",
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                    }}
-                  >
-                    <Plus size={12} /> Add Item
-                  </button>
-                </div>
-                {/* col headers */}
+                  1 — Order Details
+                </p>
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr 80px 100px",
-                    gap: 8,
-                    marginBottom: 6,
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 14,
                   }}
                 >
-                  {["Product", "Qty", "Cost (R)"].map((h) => (
-                    <p
-                      key={h}
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        color: "#94a3b8",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.06em",
-                      }}
+                  <div>
+                    <label style={LABEL}>
+                      Supplier <span style={{ color: "#ef4444" }}>*</span>
+                    </label>
+                    <select
+                      value={form.supplierId}
+                      onChange={(e) => handleSupplierChange(e.target.value)}
+                      style={{ ...INPUT, cursor: "pointer" }}
+                      className="po-input"
                     >
-                      {h}
-                    </p>
-                  ))}
-                </div>
-                <div
-                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
-                >
-                  {form.items.map((item, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 80px 100px",
-                        gap: 8,
-                      }}
+                      <option value="">Select supplier…</option>
+                      {suppliers?.map((s: any) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={LABEL}>
+                      Warehouse <span style={{ color: "#ef4444" }}>*</span>
+                    </label>
+                    <select
+                      value={form.warehouseId}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, warehouseId: e.target.value }))
+                      }
+                      style={{ ...INPUT, cursor: "pointer" }}
+                      className="po-input"
                     >
-                      <select
-                        value={item.productId}
-                        onChange={(e) =>
-                          updateItem(i, "productId", e.target.value)
-                        }
-                        style={{
-                          ...SELECT,
-                          padding: "9px 10px",
-                          fontSize: 12,
-                          background: "#fff",
-                        }}
-                        className="item-input"
-                      >
-                        <option value="">Select…</option>
-                        {products?.data?.map((p: any) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="number"
-                        min="1"
-                        value={item.quantityOrdered}
-                        onChange={(e) =>
-                          updateItem(
-                            i,
-                            "quantityOrdered",
-                            parseInt(e.target.value) || 0,
-                          )
-                        }
-                        style={{
-                          ...INPUT,
-                          padding: "9px 10px",
-                          fontSize: 12,
-                          background: "#fff",
-                        }}
-                        className="item-input"
-                      />
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.unitCost}
-                        onChange={(e) =>
-                          updateItem(
-                            i,
-                            "unitCost",
-                            parseFloat(e.target.value) || 0,
-                          )
-                        }
-                        style={{
-                          ...INPUT,
-                          padding: "9px 10px",
-                          fontSize: 12,
-                          background: "#fff",
-                        }}
-                        className="item-input"
-                      />
-                    </div>
-                  ))}
+                      <option value="">Select warehouse…</option>
+                      {warehouses?.map((w: any) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={LABEL}>Currency</label>
+                    <select
+                      value={form.currency}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, currency: e.target.value }))
+                      }
+                      style={{ ...INPUT, cursor: "pointer" }}
+                      className="po-input"
+                    >
+                      {["ZAR", "USD", "EUR", "GBP"].map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={LABEL}>Expected Delivery</label>
+                    <input
+                      type="date"
+                      value={form.expectedDeliveryDate}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          expectedDeliveryDate: e.target.value,
+                        }))
+                      }
+                      style={INPUT}
+                      className="po-input"
+                    />
+                  </div>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label style={LABEL}>Notes</label>
+                    <textarea
+                      value={form.notes}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, notes: e.target.value }))
+                      }
+                      placeholder="Any special instructions…"
+                      rows={2}
+                      style={{ ...INPUT, resize: "vertical" }}
+                      className="po-input"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <Field label="Notes">
-                <input
-                  type="text"
-                  value={form.notes}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, notes: e.target.value }))
-                  }
-                  placeholder="Optional notes…"
-                  style={INPUT}
-                  className="po-input"
-                />
-              </Field>
-            </div>
+              {/* step 2 - supplier catalogue */}
+              <div>
+                <p
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "#94a3b8",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    marginBottom: 14,
+                  }}
+                >
+                  2 — Select Products from Supplier Catalogue
+                </p>
 
-            {/* footer */}
-            <div style={{ padding: "0 22px 22px", display: "flex", gap: 10 }}>
-              <button
-                onClick={() => setShowCreate(false)}
-                style={{
-                  flex: 1,
-                  padding: 12,
-                  borderRadius: 11,
-                  background: "#f8fafc",
-                  border: "1.5px solid #e2e8f0",
-                  color: "#475569",
-                  fontWeight: 600,
-                  fontSize: 13,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "#f1f5f9")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = "#f8fafc")
-                }
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => createMutation.mutate(form)}
-                disabled={
-                  !form.supplierId ||
-                  !form.warehouseId ||
-                  createMutation.isPending
-                }
-                style={{
-                  flex: 1,
-                  padding: 12,
-                  borderRadius: 11,
-                  background: "linear-gradient(135deg,#f59e0b,#d97706)",
-                  color: "#fff",
-                  fontWeight: 700,
-                  fontSize: 13,
-                  border: "none",
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  opacity:
+                {!form.supplierId ? (
+                  <div
+                    style={{
+                      background: "#f8fafc",
+                      borderRadius: 12,
+                      border: "2px dashed #e2e8f0",
+                      padding: "32px 20px",
+                      textAlign: "center",
+                    }}
+                  >
+                    <Package
+                      size={28}
+                      color="#cbd5e1"
+                      style={{ margin: "0 auto 8px" }}
+                    />
+                    <p style={{ fontSize: 13, color: "#94a3b8" }}>
+                      Select a supplier above to browse their product catalogue
+                    </p>
+                  </div>
+                ) : catalogueLoading ? (
+                  <div
+                    style={{
+                      background: "#f8fafc",
+                      borderRadius: 12,
+                      padding: "24px 20px",
+                      textAlign: "center",
+                    }}
+                  >
+                    <p style={{ fontSize: 13, color: "#94a3b8" }}>
+                      Loading catalogue…
+                    </p>
+                  </div>
+                ) : supplierCatalogue.length === 0 ? (
+                  <div
+                    style={{
+                      background: "#f8fafc",
+                      borderRadius: 12,
+                      border: "2px dashed #e2e8f0",
+                      padding: "32px 20px",
+                      textAlign: "center",
+                    }}
+                  >
+                    <Package
+                      size={28}
+                      color="#cbd5e1"
+                      style={{ margin: "0 auto 8px" }}
+                    />
+                    <p
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#475569",
+                      }}
+                    >
+                      This supplier hasn't added any products yet
+                    </p>
+                    <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>
+                      Ask them to add products in their supplier portal.
+                    </p>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fill,minmax(220px,1fr))",
+                      gap: 10,
+                      maxHeight: 320,
+                      overflowY: "auto",
+                      paddingRight: 4,
+                    }}
+                  >
+                    {supplierCatalogue.map((item: any) => {
+                      const isSelected = selectedItems.some(
+                        (i) => i.id === item.id,
+                      );
+                      return (
+                        <div
+                          key={item.id}
+                          className={`cat-item${isSelected ? " selected" : ""}`}
+                          onClick={() => toggleItem(item)}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "flex-start",
+                              justifyContent: "space-between",
+                              gap: 8,
+                              marginBottom: 6,
+                            }}
+                          >
+                            <p
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 700,
+                                color: "#0f172a",
+                                lineHeight: 1.3,
+                              }}
+                            >
+                              {item.name}
+                            </p>
+                            <div
+                              style={{ display: "flex", gap: 4, flexShrink: 0 }}
+                            >
+                              {item.isPreferred && (
+                                <Star
+                                  size={13}
+                                  color="#d97706"
+                                  fill="#d97706"
+                                />
+                              )}
+                              <div
+                                style={{
+                                  width: 18,
+                                  height: 18,
+                                  borderRadius: "50%",
+                                  border: `2px solid ${isSelected ? "#d97706" : "#d1d5db"}`,
+                                  background: isSelected ? "#d97706" : "#fff",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {isSelected && (
+                                  <span
+                                    style={{
+                                      color: "#fff",
+                                      fontSize: 9,
+                                      fontWeight: 800,
+                                    }}
+                                  >
+                                    ✓
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          {item.sku && (
+                            <p
+                              style={{
+                                fontSize: 11,
+                                color: "#94a3b8",
+                                marginBottom: 4,
+                                fontFamily: "monospace",
+                              }}
+                            >
+                              {item.sku}
+                            </p>
+                          )}
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              marginTop: 8,
+                            }}
+                          >
+                            <p
+                              style={{
+                                fontSize: 14,
+                                fontWeight: 800,
+                                color: "#d97706",
+                              }}
+                            >
+                              ${parseFloat(item.unitCost).toFixed(2)}
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 500,
+                                  color: "#94a3b8",
+                                }}
+                              >
+                                /{item.unit || "unit"}
+                              </span>
+                            </p>
+                            {item.leadTimeDays && (
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  color: "#64748b",
+                                  background: "#f1f5f9",
+                                  padding: "2px 7px",
+                                  borderRadius: 6,
+                                }}
+                              >
+                                {item.leadTimeDays}d lead
+                              </span>
+                            )}
+                          </div>
+                          {item.minimumOrderQuantity > 1 && (
+                            <p
+                              style={{
+                                fontSize: 11,
+                                color: "#94a3b8",
+                                marginTop: 3,
+                              }}
+                            >
+                              Min. {item.minimumOrderQuantity} units
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* step 3 - selected items */}
+              {selectedItems.length > 0 && (
+                <div>
+                  <p
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: "#94a3b8",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                      marginBottom: 14,
+                    }}
+                  >
+                    3 — Review & Adjust Order
+                  </p>
+                  <div
+                    style={{
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 12,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <table
+                      style={{ width: "100%", borderCollapse: "collapse" }}
+                    >
+                      <thead>
+                        <tr>
+                          {[
+                            "Product",
+                            "Unit Cost",
+                            "Quantity",
+                            "Subtotal",
+                            "",
+                          ].map((h) => (
+                            <th key={h} style={{ ...TH, fontSize: 10 }}>
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedItems.map((item) => (
+                          <tr
+                            key={item.id}
+                            style={{ borderBottom: "1px solid #f8fafc" }}
+                          >
+                            <td style={{ padding: "10px 16px" }}>
+                              <p
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  color: "#0f172a",
+                                }}
+                              >
+                                {item.name}
+                              </p>
+                              {item.sku && (
+                                <p
+                                  style={{
+                                    fontSize: 11,
+                                    color: "#94a3b8",
+                                    fontFamily: "monospace",
+                                  }}
+                                >
+                                  {item.sku}
+                                </p>
+                              )}
+                            </td>
+                            <td style={{ padding: "10px 16px" }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                }}
+                              >
+                                <span
+                                  style={{ fontSize: 12, color: "#64748b" }}
+                                >
+                                  $
+                                </span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={item.unitCost}
+                                  onChange={(e) =>
+                                    updatePrice(
+                                      item.id,
+                                      parseFloat(e.target.value) || 0,
+                                    )
+                                  }
+                                  style={{
+                                    width: 80,
+                                    padding: "6px 8px",
+                                    background: "#f8fafc",
+                                    border: "1px solid #e2e8f0",
+                                    borderRadius: 8,
+                                    fontSize: 13,
+                                    fontFamily: "inherit",
+                                    outline: "none",
+                                    textAlign: "right",
+                                  }}
+                                  className="po-input"
+                                />
+                              </div>
+                            </td>
+                            <td style={{ padding: "10px 16px" }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                }}
+                              >
+                                <button
+                                  onClick={() =>
+                                    updateQty(item.id, item.quantity - 1)
+                                  }
+                                  style={{
+                                    width: 26,
+                                    height: 26,
+                                    borderRadius: 6,
+                                    background: "#f1f5f9",
+                                    border: "1px solid #e2e8f0",
+                                    cursor: "pointer",
+                                    fontSize: 14,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: "#475569",
+                                  }}
+                                >
+                                  −
+                                </button>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={item.quantity}
+                                  onChange={(e) =>
+                                    updateQty(
+                                      item.id,
+                                      parseInt(e.target.value) || 1,
+                                    )
+                                  }
+                                  style={{
+                                    width: 52,
+                                    padding: "5px 8px",
+                                    background: "#f8fafc",
+                                    border: "1px solid #e2e8f0",
+                                    borderRadius: 8,
+                                    fontSize: 13,
+                                    fontFamily: "inherit",
+                                    outline: "none",
+                                    textAlign: "center",
+                                  }}
+                                />
+                                <button
+                                  onClick={() =>
+                                    updateQty(item.id, item.quantity + 1)
+                                  }
+                                  style={{
+                                    width: 26,
+                                    height: 26,
+                                    borderRadius: 6,
+                                    background: "#f1f5f9",
+                                    border: "1px solid #e2e8f0",
+                                    cursor: "pointer",
+                                    fontSize: 14,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: "#475569",
+                                  }}
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </td>
+                            <td
+                              style={{
+                                padding: "10px 16px",
+                                fontSize: 13,
+                                fontWeight: 700,
+                                color: "#0f172a",
+                              }}
+                            >
+                              $
+                              {(item.unitCost * item.quantity).toLocaleString(
+                                undefined,
+                                { minimumFractionDigits: 2 },
+                              )}
+                            </td>
+                            <td style={{ padding: "10px 16px" }}>
+                              <button
+                                onClick={() =>
+                                  setSelectedItems((p) =>
+                                    p.filter((i) => i.id !== item.id),
+                                  )
+                                }
+                                style={{
+                                  width: 28,
+                                  height: 28,
+                                  borderRadius: 7,
+                                  background: "#fff1f2",
+                                  border: "1px solid #fecdd3",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  cursor: "pointer",
+                                  color: "#e11d48",
+                                }}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                        <tr>
+                          <td
+                            colSpan={3}
+                            style={{
+                              padding: "12px 16px",
+                              textAlign: "right",
+                              fontSize: 13,
+                              fontWeight: 700,
+                              color: "#374151",
+                            }}
+                          >
+                            Order Total:
+                          </td>
+                          <td
+                            colSpan={2}
+                            style={{
+                              padding: "12px 16px",
+                              fontSize: 16,
+                              fontWeight: 800,
+                              color: "#d97706",
+                            }}
+                          >
+                            {form.currency}{" "}
+                            {orderTotal.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                            })}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* validation message */}
+              {createMutation.isError && (
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: "#e11d48",
+                    padding: "10px 14px",
+                    background: "#fff1f2",
+                    borderRadius: 9,
+                  }}
+                >
+                  Failed to create PO. Please check all fields and try again.
+                </p>
+              )}
+
+              {/* actions */}
+              <div style={{ display: "flex", gap: 10, paddingTop: 4 }}>
+                <button
+                  onClick={resetForm}
+                  style={{
+                    flex: 1,
+                    padding: 13,
+                    borderRadius: 11,
+                    background: "#f8fafc",
+                    border: "1.5px solid #e2e8f0",
+                    color: "#475569",
+                    fontWeight: 600,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitPO}
+                  disabled={
                     !form.supplierId ||
                     !form.warehouseId ||
+                    selectedItems.length === 0 ||
                     createMutation.isPending
-                      ? 0.5
-                      : 1,
-                  boxShadow: "0 4px 14px rgba(245,158,11,.3)",
-                }}
-              >
-                {createMutation.isPending
-                  ? "Creating…"
-                  : "Create Purchase Order"}
-              </button>
+                  }
+                  style={{
+                    flex: 2,
+                    padding: 13,
+                    borderRadius: 11,
+                    background: "linear-gradient(135deg,#f59e0b,#d97706)",
+                    color: "#fff",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    border: "none",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    opacity:
+                      !form.supplierId ||
+                      !form.warehouseId ||
+                      selectedItems.length === 0 ||
+                      createMutation.isPending
+                        ? 0.5
+                        : 1,
+                    boxShadow: "0 4px 14px rgba(245,158,11,.3)",
+                  }}
+                >
+                  {createMutation.isPending
+                    ? "Creating…"
+                    : `Create PO${selectedItems.length > 0 ? ` (${selectedItems.length} item${selectedItems.length !== 1 ? "s" : ""})` : ""}`}
+                </button>
+              </div>
             </div>
           </div>
         </div>
