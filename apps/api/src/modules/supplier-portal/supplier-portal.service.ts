@@ -32,6 +32,7 @@ import {
   CreateCatalogueItemDto,
 } from './dto/supplier-portal.dto';
 import { SupplierCatalogueItem } from './entities/supplier-catalogue-item.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class SupplierPortalService {
@@ -60,6 +61,7 @@ export class SupplierPortalService {
     private configService: ConfigService,
     @InjectRepository(SupplierCatalogueItem)
     private catalogueItemRepo: Repository<SupplierCatalogueItem>,
+    private notificationsService: NotificationsService,
   ) {
     this.resend = new Resend(this.configService.get('RESEND_API_KEY'));
   }
@@ -237,12 +239,21 @@ export class SupplierPortalService {
       dto.action === 'confirm' ? POStatus.CONFIRMED : POStatus.REJECTED;
     await this.poRepo.update(poId, { status: newStatus });
 
+    const supplierUser = await this.supplierUserRepo.findOne({
+      where: { id: supplierUserId },
+    });
+
+    await this.notificationsService.createForOrg({
+      organizationId: po.organizationId,
+      type: dto.action === 'confirm' ? 'po_confirmed' : 'po_rejected',
+      title: `PO ${po.poNumber} ${dto.action === 'confirm' ? 'Confirmed' : 'Rejected'}`,
+      message: `${supplierUser?.firstName} ${supplierUser?.lastName} from ${po.supplier?.name} has ${dto.action === 'confirm' ? 'confirmed' : 'rejected'} purchase order ${po.poNumber}${dto.notes ? `: "${dto.notes}"` : '.'}`,
+      data: { poId: po.id, poNumber: po.poNumber, action: dto.action },
+    });
+
     // notify org users via email
     const orgUsers = await this.userRepo.find({
       where: { organizationId: po.organizationId, isActive: true },
-    });
-    const supplierUser = await this.supplierUserRepo.findOne({
-      where: { id: supplierUserId },
     });
     const fromEmail =
       this.configService.get('INVITE_FROM_EMAIL') ?? 'onboarding@resend.dev';
@@ -287,6 +298,17 @@ export class SupplierPortalService {
     );
 
     return { message: `PO ${actionLabel} successfully`, status: newStatus };
+  }
+  async getCatalogueBySupplier(supplierId: string) {
+    const links = await this.supplierUserOrgRepo.find({
+      where: { supplierId },
+    });
+    if (!links.length) return [];
+    const supplierUserIds = links.map((l) => l.supplierUserOrId);
+    return this.catalogueItemRepo.find({
+      where: supplierUserIds.map((id) => ({ supplierUserId: id })),
+      order: { isPreferred: 'DESC', name: 'ASC' },
+    });
   }
 
   // ── Notify supplier when PO is sent ───────────────────────────────────────

@@ -15,7 +15,12 @@ import { Type } from 'class-transformer';
 
 export class POItemDto {
   @IsUUID()
-  productId: string;
+  @IsOptional()
+  productId?: string;
+
+  @IsString()
+  @IsOptional()
+  productName?: string;
 
   @IsInt()
   @Min(1)

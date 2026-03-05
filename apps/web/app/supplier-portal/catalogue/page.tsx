@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { useRouter } from "next/navigation";
-import { Package, ArrowLeft, Plus, X, Star, Edit2 } from "lucide-react";
+import { Package, ArrowLeft, Plus, X, Star, Edit2, Search } from "lucide-react";
 
 const ACCENT = "#e11d48";
 const INPUT: React.CSSProperties = {
@@ -45,9 +45,11 @@ function getApi() {
 }
 
 const EMPTY_FORM = {
-  supplierId: "",
-  productId: "",
+  name: "",
+  sku: "",
+  description: "",
   unitCost: "",
+  unit: "",
   minimumOrderQuantity: "1",
   leadTimeDays: "",
   isPreferred: false,
@@ -58,10 +60,9 @@ export default function CataloguePage() {
   const queryClient = useQueryClient();
   const [hydrated, setHydrated] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<any>(EMPTY_FORM);
   const [search, setSearch] = useState("");
-  const [orgProducts, setOrgProducts] = useState<any[]>([]);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
 
   useEffect(() => {
     const token = localStorage.getItem("supplier_token");
@@ -72,67 +73,71 @@ export default function CataloguePage() {
     setHydrated(true);
   }, []);
 
-  const { data: catalogue = [], isLoading } = useQuery({
+  const { data: catalogue = [], isLoading } = useQuery<any[]>({
     queryKey: ["supplier-catalogue"],
     queryFn: () =>
       getApi()
         .get("/supplier-portal/catalogue")
         .then((r) => r.data),
     enabled: hydrated,
-    onSuccess: (data: any[]) => {
-      // extract unique suppliers from catalogue
-      const uniqueSuppliers = Array.from(
-        new Map(data.map((i: any) => [i.supplierId, i.supplier])).values(),
-      );
-      setSuppliers(uniqueSuppliers);
-    },
   });
 
-  // fetch org products when a supplier is selected
-  useEffect(() => {
-    if (!form.supplierId || !hydrated) return;
-    const item = catalogue.find((c: any) => c.supplierId === form.supplierId);
-    if (!item) return;
-    getApi()
-      .get(`/products`)
-      .then((r) => {
-        const data = Array.isArray(r.data)
-          ? r.data
-          : (r.data.data ?? r.data.items ?? []);
-        setOrgProducts(data);
-      })
-      .catch(() => {});
-  }, [form.supplierId, hydrated]);
-
-  const upsertMutation = useMutation({
-    mutationFn: (d: any) => getApi().post("/supplier-portal/catalogue", d),
+  const saveMutation = useMutation({
+    mutationFn: (d: any) =>
+      editingId
+        ? getApi().patch(`/supplier-portal/catalogue/${editingId}`, d)
+        : getApi().post("/supplier-portal/catalogue", d),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["supplier-catalogue"] });
       setShowModal(false);
       setForm(EMPTY_FORM);
+      setEditingId(null);
     },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) =>
+      getApi().delete(`/supplier-portal/catalogue/${id}`),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["supplier-catalogue"] }),
   });
 
   const set = (k: string, v: any) => setForm((p: any) => ({ ...p, [k]: v }));
 
-  const filtered = catalogue.filter(
-    (item: any) =>
-      item.product?.name?.toLowerCase().includes(search.toLowerCase()) ||
-      item.product?.sku?.toLowerCase().includes(search.toLowerCase()) ||
-      item.supplier?.name?.toLowerCase().includes(search.toLowerCase()),
-  );
+  const openEdit = (item: any) => {
+    setForm({
+      name: item.name,
+      sku: item.sku ?? "",
+      description: item.description ?? "",
+      unitCost: item.unitCost.toString(),
+      unit: item.unit ?? "",
+      minimumOrderQuantity: item.minimumOrderQuantity.toString(),
+      leadTimeDays: item.leadTimeDays?.toString() ?? "",
+      isPreferred: item.isPreferred,
+    });
+    setEditingId(item.id);
+    setShowModal(true);
+  };
 
   const submit = () => {
-    if (!form.supplierId || !form.productId || !form.unitCost) return;
-    upsertMutation.mutate({
-      supplierId: form.supplierId,
-      productId: form.productId,
+    if (!form.name || !form.unitCost) return;
+    saveMutation.mutate({
+      name: form.name,
+      sku: form.sku || undefined,
+      description: form.description || undefined,
       unitCost: parseFloat(form.unitCost),
+      unit: form.unit || undefined,
       minimumOrderQuantity: parseInt(form.minimumOrderQuantity) || 1,
       leadTimeDays: form.leadTimeDays ? parseInt(form.leadTimeDays) : undefined,
       isPreferred: form.isPreferred,
     });
   };
+
+  const filtered = catalogue.filter(
+    (item: any) =>
+      item.name?.toLowerCase().includes(search.toLowerCase()) ||
+      item.sku?.toLowerCase().includes(search.toLowerCase()),
+  );
 
   return (
     <div
@@ -193,7 +198,11 @@ export default function CataloguePage() {
           </div>
         </div>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={() => {
+            setForm(EMPTY_FORM);
+            setEditingId(null);
+            setShowModal(true);
+          }}
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -225,21 +234,12 @@ export default function CataloguePage() {
       >
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>
-            Product Catalogue
+            My Product Catalogue
           </h1>
           <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 4 }}>
-            Manage the products you supply and your pricing
+            Add and manage the products you supply with your pricing and terms
           </p>
         </div>
-
-        {/* search */}
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by product name, SKU, or supplier…"
-          style={{ ...INPUT, maxWidth: 400 }}
-          className="cat-input"
-        />
 
         {/* stats */}
         <div
@@ -250,43 +250,51 @@ export default function CataloguePage() {
           }}
         >
           {[
-            {
-              label: "Total Products",
-              value: catalogue.length,
-              color: ACCENT,
-              bg: "#fff1f2",
-            },
+            { label: "Total Products", value: catalogue.length, color: ACCENT },
             {
               label: "Preferred Items",
               value: catalogue.filter((i: any) => i.isPreferred).length,
               color: "#f59e0b",
-              bg: "#fffbeb",
             },
             {
-              label: "Suppliers",
-              value: suppliers.length,
+              label: "Avg. Lead Time",
+              value: catalogue.length
+                ? `${Math.round(catalogue.filter((i: any) => i.leadTimeDays).reduce((a: number, i: any) => a + i.leadTimeDays, 0) / (catalogue.filter((i: any) => i.leadTimeDays).length || 1))}d`
+                : "—",
               color: "#8b5cf6",
-              bg: "#f5f3ff",
             },
           ].map((s) => (
-            <div
-              key={s.label}
-              style={{
-                ...CARD,
-                padding: "14px 18px",
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-              }}
-            >
-              <div>
-                <p style={{ fontSize: 20, fontWeight: 800, color: s.color }}>
-                  {s.value}
-                </p>
-                <p style={{ fontSize: 12, color: "#94a3b8" }}>{s.label}</p>
-              </div>
+            <div key={s.label} style={{ ...CARD, padding: "14px 18px" }}>
+              <p style={{ fontSize: 20, fontWeight: 800, color: s.color }}>
+                {s.value}
+              </p>
+              <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>
+                {s.label}
+              </p>
             </div>
           ))}
+        </div>
+
+        {/* search */}
+        <div style={{ position: "relative", maxWidth: 380 }}>
+          <Search
+            size={14}
+            color="#94a3b8"
+            style={{
+              position: "absolute",
+              left: 12,
+              top: "50%",
+              transform: "translateY(-50%)",
+              pointerEvents: "none",
+            }}
+          />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or SKU…"
+            style={{ ...INPUT, paddingLeft: 36 }}
+            className="cat-input"
+          />
         </div>
 
         {/* table */}
@@ -303,12 +311,38 @@ export default function CataloguePage() {
                 style={{ margin: "0 auto 12px" }}
               />
               <p style={{ fontSize: 14, fontWeight: 600, color: "#475569" }}>
-                No products in catalogue
+                {search ? "No products match your search" : "No products yet"}
               </p>
               <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 4 }}>
-                Add products you supply so organizations can browse your
-                catalogue.
+                {!search &&
+                  "Add the products you supply so organizations can browse your catalogue."}
               </p>
+              {!search && (
+                <button
+                  onClick={() => {
+                    setForm(EMPTY_FORM);
+                    setEditingId(null);
+                    setShowModal(true);
+                  }}
+                  style={{
+                    marginTop: 16,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "10px 20px",
+                    borderRadius: 11,
+                    background: `linear-gradient(135deg,${ACCENT},#be123c)`,
+                    color: "#fff",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    border: "none",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  <Plus size={14} /> Add First Product
+                </button>
+              )}
             </div>
           ) : (
             <div style={{ overflowX: "auto" }}>
@@ -318,8 +352,8 @@ export default function CataloguePage() {
                     {[
                       "Product",
                       "SKU",
-                      "Supplier",
                       "Unit Cost",
+                      "Unit",
                       "Min. Order",
                       "Lead Time",
                       "Preferred",
@@ -359,32 +393,40 @@ export default function CataloguePage() {
                             color: "#0f172a",
                           }}
                         >
-                          {item.product?.name ?? "—"}
+                          {item.name}
                         </p>
+                        {item.description && (
+                          <p
+                            style={{
+                              fontSize: 11,
+                              color: "#94a3b8",
+                              marginTop: 2,
+                            }}
+                          >
+                            {item.description}
+                          </p>
+                        )}
                       </td>
                       <td style={{ padding: "13px 20px" }}>
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontFamily: "monospace",
-                            background: "#f8fafc",
-                            border: "1px solid #e2e8f0",
-                            borderRadius: 4,
-                            padding: "2px 7px",
-                            color: "#475569",
-                          }}
-                        >
-                          {item.product?.sku ?? "—"}
-                        </span>
-                      </td>
-                      <td
-                        style={{
-                          padding: "13px 20px",
-                          fontSize: 13,
-                          color: "#475569",
-                        }}
-                      >
-                        {item.supplier?.name ?? "—"}
+                        {item.sku ? (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontFamily: "monospace",
+                              background: "#f8fafc",
+                              border: "1px solid #e2e8f0",
+                              borderRadius: 4,
+                              padding: "2px 7px",
+                              color: "#475569",
+                            }}
+                          >
+                            {item.sku}
+                          </span>
+                        ) : (
+                          <span style={{ color: "#94a3b8", fontSize: 12 }}>
+                            —
+                          </span>
+                        )}
                       </td>
                       <td
                         style={{
@@ -406,6 +448,15 @@ export default function CataloguePage() {
                           color: "#475569",
                         }}
                       >
+                        {item.unit || "—"}
+                      </td>
+                      <td
+                        style={{
+                          padding: "13px 20px",
+                          fontSize: 13,
+                          color: "#475569",
+                        }}
+                      >
                         {item.minimumOrderQuantity} units
                       </td>
                       <td
@@ -415,7 +466,7 @@ export default function CataloguePage() {
                           color: "#475569",
                         }}
                       >
-                        {item.leadTimeDays ? `${item.leadTimeDays}d` : "—"}
+                        {item.leadTimeDays ? `${item.leadTimeDays} days` : "—"}
                       </td>
                       <td style={{ padding: "13px 20px" }}>
                         {item.isPreferred ? (
@@ -442,37 +493,42 @@ export default function CataloguePage() {
                         )}
                       </td>
                       <td style={{ padding: "13px 20px" }}>
-                        <button
-                          onClick={() => {
-                            set("supplierId", item.supplierId);
-                            set("productId", item.productId);
-                            set("unitCost", item.unitCost.toString());
-                            set(
-                              "minimumOrderQuantity",
-                              item.minimumOrderQuantity.toString(),
-                            );
-                            set(
-                              "leadTimeDays",
-                              item.leadTimeDays?.toString() ?? "",
-                            );
-                            set("isPreferred", item.isPreferred);
-                            setShowModal(true);
-                          }}
-                          style={{
-                            width: 30,
-                            height: 30,
-                            borderRadius: 8,
-                            background: "#f8fafc",
-                            border: "1px solid #e2e8f0",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            cursor: "pointer",
-                            color: "#64748b",
-                          }}
-                        >
-                          <Edit2 size={13} />
-                        </button>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button
+                            onClick={() => openEdit(item)}
+                            style={{
+                              width: 30,
+                              height: 30,
+                              borderRadius: 8,
+                              background: "#f8fafc",
+                              border: "1px solid #e2e8f0",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                              color: "#64748b",
+                            }}
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                          <button
+                            onClick={() => deleteMutation.mutate(item.id)}
+                            style={{
+                              width: 30,
+                              height: 30,
+                              borderRadius: 8,
+                              background: "#fff1f2",
+                              border: "1px solid #fecdd3",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                              color: ACCENT,
+                            }}
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -503,7 +559,7 @@ export default function CataloguePage() {
               background: "#fff",
               borderRadius: 20,
               width: "100%",
-              maxWidth: 460,
+              maxWidth: 480,
               padding: "28px",
               boxShadow: "0 24px 64px rgba(0,0,0,.22)",
               fontFamily: "'Outfit', sans-serif",
@@ -520,12 +576,13 @@ export default function CataloguePage() {
               }}
             >
               <p style={{ fontWeight: 800, fontSize: 16, color: "#0f172a" }}>
-                Add / Update Product
+                {editingId ? "Edit Product" : "Add Product"}
               </p>
               <button
                 onClick={() => {
                   setShowModal(false);
                   setForm(EMPTY_FORM);
+                  setEditingId(null);
                 }}
                 style={{
                   width: 32,
@@ -547,46 +604,56 @@ export default function CataloguePage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
                 <label style={LABEL}>
-                  Supplier <span style={{ color: "#ef4444" }}>*</span>
+                  Product Name <span style={{ color: "#ef4444" }}>*</span>
                 </label>
-                <select
-                  value={form.supplierId}
-                  onChange={(e) => set("supplierId", e.target.value)}
-                  style={{ ...INPUT, cursor: "pointer" }}
+                <input
+                  value={form.name}
+                  onChange={(e) => set("name", e.target.value)}
+                  placeholder="e.g. Industrial Steel Bolts M8"
+                  style={INPUT}
                   className="cat-input"
-                >
-                  <option value="">Select supplier…</option>
-                  {suppliers.map((s: any) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
+                />
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <label style={LABEL}>SKU / Part Number</label>
+                  <input
+                    value={form.sku}
+                    onChange={(e) => set("sku", e.target.value)}
+                    placeholder="e.g. STL-M8-100"
+                    style={INPUT}
+                    className="cat-input"
+                  />
+                </div>
+                <div>
+                  <label style={LABEL}>Unit of Measure</label>
+                  <input
+                    value={form.unit}
+                    onChange={(e) => set("unit", e.target.value)}
+                    placeholder="e.g. kg, pcs, box"
+                    style={INPUT}
+                    className="cat-input"
+                  />
+                </div>
               </div>
 
               <div>
-                <label style={LABEL}>
-                  Product <span style={{ color: "#ef4444" }}>*</span>
-                </label>
-                <select
-                  value={form.productId}
-                  onChange={(e) => set("productId", e.target.value)}
-                  style={{ ...INPUT, cursor: "pointer" }}
+                <label style={LABEL}>Description</label>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => set("description", e.target.value)}
+                  placeholder="Brief product description…"
+                  rows={2}
+                  style={{ ...INPUT, resize: "vertical" }}
                   className="cat-input"
-                  disabled={!form.supplierId}
-                >
-                  <option value="">Select product…</option>
-                  {orgProducts.map((p: any) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} {p.sku ? `(${p.sku})` : ""}
-                    </option>
-                  ))}
-                </select>
-                {!form.supplierId && (
-                  <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
-                    Select a supplier first
-                  </p>
-                )}
+                />
               </div>
 
               <div
@@ -681,16 +748,17 @@ export default function CataloguePage() {
                     Mark as preferred item
                   </p>
                   <p style={{ fontSize: 12, color: "#b45309" }}>
-                    Organizations will see this as your preferred product
+                    Highlights this product when organizations browse your
+                    catalogue
                   </p>
                 </div>
               </div>
 
-              {upsertMutation.isError && (
+              {saveMutation.isError && (
                 <p
                   style={{
                     fontSize: 12,
-                    color: "#e11d48",
+                    color: ACCENT,
                     padding: "8px 12px",
                     background: "#fff1f2",
                     borderRadius: 8,
@@ -705,6 +773,7 @@ export default function CataloguePage() {
                   onClick={() => {
                     setShowModal(false);
                     setForm(EMPTY_FORM);
+                    setEditingId(null);
                   }}
                   style={{
                     flex: 1,
@@ -724,10 +793,7 @@ export default function CataloguePage() {
                 <button
                   onClick={submit}
                   disabled={
-                    !form.supplierId ||
-                    !form.productId ||
-                    !form.unitCost ||
-                    upsertMutation.isPending
+                    !form.name || !form.unitCost || saveMutation.isPending
                   }
                   style={{
                     flex: 1,
@@ -741,15 +807,16 @@ export default function CataloguePage() {
                     cursor: "pointer",
                     fontFamily: "inherit",
                     opacity:
-                      !form.supplierId ||
-                      !form.productId ||
-                      !form.unitCost ||
-                      upsertMutation.isPending
+                      !form.name || !form.unitCost || saveMutation.isPending
                         ? 0.5
                         : 1,
                   }}
                 >
-                  {upsertMutation.isPending ? "Saving…" : "Save Product"}
+                  {saveMutation.isPending
+                    ? "Saving…"
+                    : editingId
+                      ? "Update Product"
+                      : "Add Product"}
                 </button>
               </div>
             </div>

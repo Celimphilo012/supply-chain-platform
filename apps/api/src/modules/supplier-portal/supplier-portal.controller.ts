@@ -105,4 +105,11 @@ export class SupplierPortalController {
   markRead(@Req() req: any) {
     return this.service.markNotificationsRead(req.supplierUser.id);
   }
+  @Get('supplier-catalogue/:supplierId')
+  @UseGuards(JwtAuthGuard)
+  getSupplierCatalogueForOrg(
+    @Param('supplierId', ParseUUIDPipe) supplierId: string,
+  ) {
+    return this.service.getCatalogueBySupplier(supplierId);
+  }
 }

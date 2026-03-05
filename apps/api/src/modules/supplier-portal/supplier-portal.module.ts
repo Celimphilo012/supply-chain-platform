@@ -16,6 +16,7 @@ import { SupplierPortalController } from './supplier-portal.controller';
 import { SupplierJwtAuthGuard } from './guards/supplier-jwt.guard';
 import { SuppliersModule } from '../suppliers/suppliers.module';
 import { SupplierCatalogueItem } from './entities/supplier-catalogue-item.entity';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { SupplierCatalogueItem } from './entities/supplier-catalogue-item.entity
     ]),
     JwtModule.register({}),
     forwardRef(() => SuppliersModule),
+    NotificationsModule,
   ],
   controllers: [SupplierPortalController],
   providers: [SupplierPortalService, SupplierJwtAuthGuard],

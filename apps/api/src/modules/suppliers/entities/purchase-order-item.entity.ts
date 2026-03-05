@@ -21,12 +21,20 @@ export class PurchaseOrderItem {
   @JoinColumn({ name: 'purchase_order_id' })
   purchaseOrder: PurchaseOrder;
 
-  @Column({ name: 'product_id' })
-  productId: string;
+  @Column({ name: 'product_id', type: 'uuid', nullable: true })
+  productId: string | null;
 
-  @ManyToOne(() => Product)
+  @ManyToOne(() => Product, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'product_id' })
   product: Product;
+
+  @Column({
+    name: 'product_name',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
+  productName: string | null;
 
   @Column({ name: 'quantity_ordered', type: 'int' })
   quantityOrdered: number;

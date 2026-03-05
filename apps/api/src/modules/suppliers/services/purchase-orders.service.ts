@@ -59,7 +59,8 @@ export class PurchaseOrdersService {
       createdById: userId,
       items: dto.items.map((item) =>
         this.poItemRepository.create({
-          productId: item.productId,
+          productId: item.productId ?? null,
+          productName: (item as any).productName ?? null,
           quantityOrdered: item.quantityOrdered,
           unitCost: item.unitCost,
         }),
@@ -179,7 +180,7 @@ export class PurchaseOrdersService {
         // Add to inventory with audit trail
         if (receiveItem.quantityReceived > 0) {
           await this.inventoryService.adjust(organizationId, userId, {
-            productId: poItem.productId,
+            productId: poItem.productId!,
             warehouseId: po.warehouseId,
             quantityDelta: receiveItem.quantityReceived,
             transactionType: TransactionType.RECEIPT,

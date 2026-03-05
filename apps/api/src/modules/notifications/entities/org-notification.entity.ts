@@ -3,27 +3,23 @@ import {
   Column,
   PrimaryGeneratedColumn,
   CreateDateColumn,
-  ManyToOne,
-  JoinColumn,
 } from 'typeorm';
-import { SupplierUser } from './supplier-user.entity';
 
-@Entity('supplier_notifications')
-export class SupplierNotification {
+@Entity('org_notifications')
+export class OrgNotification {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'supplier_user_id' })
-  supplierUserId: string;
+  @Column({ name: 'organization_id', type: 'uuid' })
+  organizationId: string;
 
-  @ManyToOne(() => SupplierUser)
-  @JoinColumn({ name: 'supplier_user_id' })
-  supplierUser: SupplierUser;
+  @Column({ name: 'user_id', type: 'uuid', nullable: true })
+  userId: string | null;
 
-  @Column({ length: 50 })
+  @Column({ type: 'varchar', length: 50 })
   type: string;
 
-  @Column({ length: 255 })
+  @Column({ type: 'varchar', length: 255 })
   title: string;
 
   @Column({ type: 'text' })
