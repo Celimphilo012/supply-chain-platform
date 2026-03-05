@@ -126,6 +126,39 @@ export class PurchaseOrdersService {
         .notifySupplierOfNewPO(updatedPO)
         .catch(() => {});
     }
+
+    // Auto-receive all items when status changes to RECEIVED
+    if (dto.status === POStatus.RECEIVED) {
+      const freshPO = await this.findOne(organizationId, id);
+      await this.dataSource.transaction(async (manager) => {
+        for (const poItem of freshPO.items) {
+          const qtyToReceive = poItem.quantityOrdered - poItem.quantityReceived;
+          if (qtyToReceive <= 0) continue;
+
+          await manager.update(PurchaseOrderItem, poItem.id, {
+            quantityReceived: poItem.quantityOrdered,
+          });
+
+          // only adjust inventory if linked to an org product
+          if (poItem.productId && qtyToReceive > 0) {
+            await this.inventoryService.adjust(organizationId, userId, {
+              productId: poItem.productId,
+              warehouseId: freshPO.warehouseId,
+              quantityDelta: qtyToReceive,
+              transactionType: TransactionType.RECEIPT,
+              referenceId: freshPO.id,
+              referenceType: 'purchase_order',
+              notes: `Received against PO ${freshPO.poNumber}`,
+            });
+          }
+        }
+
+        await manager.update(PurchaseOrder, id, {
+          actualDeliveryDate: new Date(),
+        });
+      });
+    }
+
     // Emit real-time PO status change
     try {
       this.realtimeService.emitPOStatusChange(organizationId, {
@@ -178,9 +211,9 @@ export class PurchaseOrdersService {
         });
 
         // Add to inventory with audit trail
-        if (receiveItem.quantityReceived > 0) {
+        if (receiveItem.quantityReceived > 0 && poItem.productId) {
           await this.inventoryService.adjust(organizationId, userId, {
-            productId: poItem.productId!,
+            productId: poItem.productId,
             warehouseId: po.warehouseId,
             quantityDelta: receiveItem.quantityReceived,
             transactionType: TransactionType.RECEIPT,
