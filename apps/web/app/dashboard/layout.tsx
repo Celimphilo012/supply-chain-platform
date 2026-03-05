@@ -12,10 +12,10 @@ import {
   Warehouse,
   LogOut,
   Menu,
-  Bell,
   X,
   Settings,
 } from "lucide-react";
+import NotificationBell from "@/components/NotificationBell";
 
 const NAV = [
   {
@@ -581,34 +581,7 @@ export default function DashboardLayout({
             <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}`}</style>
 
             {/* bell */}
-            <button
-              style={{
-                position: "relative",
-                width: 36,
-                height: 36,
-                borderRadius: 10,
-                background: "#f8fafc",
-                border: "1px solid #e2e8f0",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-              }}
-            >
-              <Bell size={16} color="#64748b" />
-              <span
-                style={{
-                  position: "absolute",
-                  top: 7,
-                  right: 7,
-                  width: 7,
-                  height: 7,
-                  borderRadius: "50%",
-                  background: "#ef4444",
-                  border: "2px solid #fff",
-                }}
-              />
-            </button>
+            <NotificationBell />
 
             {/* avatar */}
             <div
