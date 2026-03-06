@@ -139,10 +139,51 @@ export class PurchaseOrdersService {
             quantityReceived: poItem.quantityOrdered,
           });
 
-          // only adjust inventory if linked to an org product
-          if (poItem.productId && qtyToReceive > 0) {
+          // resolve productId — for catalogue items, find or create a product
+          let resolvedProductId = poItem.productId;
+
+          if (!resolvedProductId && poItem.productName) {
+            // try to find existing product by name in this org
+            const existing = (await manager
+              .createQueryBuilder()
+              .select('p')
+              .from('products', 'p')
+              .where('p.organization_id = :organizationId', { organizationId })
+              .andWhere('LOWER(p.name) = LOWER(:name)', {
+                name: poItem.productName,
+              })
+              .getOne()) as any;
+
+            if (existing) {
+              resolvedProductId = existing.id;
+            } else {
+              // create a new product from the catalogue item
+              const newProduct = await manager
+                .createQueryBuilder()
+                .insert()
+                .into('products')
+                .values({
+                  id: () => 'uuid_generate_v4()',
+                  organization_id: organizationId,
+                  name: poItem.productName,
+                  sku: `SUP-${Date.now()}`,
+                  unit_cost: poItem.unitCost,
+                  is_active: true,
+                })
+                .returning('id')
+                .execute();
+              resolvedProductId = newProduct.raw[0].id;
+            }
+
+            // save the resolved productId back to the PO item for future reference
+            await manager.update(PurchaseOrderItem, poItem.id, {
+              productId: resolvedProductId,
+            });
+          }
+
+          if (resolvedProductId && qtyToReceive > 0) {
             await this.inventoryService.adjust(organizationId, userId, {
-              productId: poItem.productId,
+              productId: resolvedProductId,
               warehouseId: freshPO.warehouseId,
               quantityDelta: qtyToReceive,
               transactionType: TransactionType.RECEIPT,
