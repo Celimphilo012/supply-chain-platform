@@ -1,6 +1,5 @@
 // apps/api/src/modules/realtime/realtime.service.ts
 import { Injectable } from '@nestjs/common';
-import { InventoryGateway } from './inventory.gateway';
 
 export interface InventoryUpdatePayload {
   productId: string;
@@ -22,29 +21,12 @@ export interface AlertPayload {
 
 @Injectable()
 export class RealtimeService {
-  constructor(private inventoryGateway: InventoryGateway) {}
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  emitInventoryUpdate(_organizationId: string, _payload: InventoryUpdatePayload) {}
 
-  emitInventoryUpdate(organizationId: string, payload: InventoryUpdatePayload) {
-    this.inventoryGateway.emitToOrganization(
-      organizationId,
-      'inventory:updated',
-      payload,
-    );
-  }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  emitAlert(_organizationId: string, _payload: AlertPayload) {}
 
-  emitAlert(organizationId: string, payload: AlertPayload) {
-    this.inventoryGateway.emitToOrganization(
-      organizationId,
-      'alert:new',
-      payload,
-    );
-  }
-
-  emitPOStatusChange(organizationId: string, payload: any) {
-    this.inventoryGateway.emitToOrganization(
-      organizationId,
-      'po:status_changed',
-      payload,
-    );
-  }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  emitPOStatusChange(_organizationId: string, _payload: any) {}
 }
